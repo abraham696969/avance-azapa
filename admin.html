@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<title>Divertí Kids · Administración</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F6FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1430" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="DK Admin">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Acceso -->
+<div class="login" id="loginView" hidden>
+  <form class="panel f" id="loginForm" novalidate>
+    <a class="logo" href="index.html"><i></i>Divertí Kids</a>
+    <div><p class="eyebrow">Acceso del equipo</p><h1>Administración</h1></div>
+    <div class="demo-hint" id="demoHint" hidden>
+      <b>Modo demo.</b> Aún no hay base de datos conectada. Entra con<br>
+      correo <b id="dUser"></b> · clave <b id="dPass"></b><br>
+      <span class="note">En este modo la clave solo es un trámite de la demo, no protege nada. Con Supabase el acceso es real.</span>
+    </div>
+    <div class="field"><label for="lMail">Correo</label><input id="lMail" type="email" autocomplete="username" inputmode="email" autocapitalize="off" required></div>
+    <div class="field"><label for="lPass">Contraseña</label><input id="lPass" type="password" autocomplete="current-password" required></div>
+    <p class="note" id="lErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
+    <button class="btn primary" id="lBtn" type="submit">Entrar</button>
+    <a class="back" href="index.html">← Volver al sitio de clientes</a>
+  </form>
+</div>
+
+<!-- Panel -->
+<div id="panelView" hidden>
+  <header class="top"><div class="wrap">
+    <a class="logo" href="admin.html"><i></i>Divertí Kids</a>
+    <span class="modebadge" id="modeBadge"></span>
+    <div class="userbar"><span id="who"></span><button class="btn sm" id="logout" type="button">Cerrar sesión</button></div>
+  </div></header>
+
+  <main class="wrap">
+    <section id="admin" style="padding-top:28px">
+      <div class="sec-head"><p class="eyebrow">Panel de administración</p><h2>Lo que ve la empresa</h2>
+        <p>Reservas con su distribución, estados, bloqueo de fechas y precios.</p></div>
+      <div class="metrics num" id="metrics"></div>
+      <div class="panel"><h3 style="margin-bottom:10px">Reservas</h3><div class="tablewrap"><table><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Abono</th><th>Estado</th><th></th></tr></thead><tbody id="resBody"></tbody></table></div></div>
+      <div class="adm2">
+        <div class="panel">
+          <h3>Bloquear fechas</h3>
+          <form class="f" id="blockForm" style="margin-top:12px" novalidate>
+            <div class="two"><div class="field"><label for="bDate">Fecha</label><input id="bDate" type="date"></div>
+            <div class="field"><label for="bWhy">Motivo</label><input id="bWhy" value="Mantención de la parcela"></div></div>
+            <button class="btn" type="submit">Bloquear fecha</button>
+          </form>
+          <ul class="lines" id="blockList" style="margin-top:12px"></ul>
+        </div>
+        <div class="panel">
+          <h3>Precios y stock del catálogo</h3>
+          <div class="tablewrap" style="margin-top:8px"><table style="min-width:420px"><thead><tr><th>Servicio</th><th>Precio</th><th>Stock</th></tr></thead><tbody id="priceBody"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+    <footer><span>Divertí Kids · Panel interno</span><span><a href="index.html" style="color:inherit">Ver sitio de clientes</a></span></footer>
+  </main>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="shared.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
