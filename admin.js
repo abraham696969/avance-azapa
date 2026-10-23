@@ -37,10 +37,11 @@ async function doAct(fn,okMsg){
 }
 
 /* ---------- panel ---------- */
+const TXC={pasto:'#7fcf7d',pastosint:'#3fae4a',tierra:'#c9a56b',madera:'#9a6a3b',cemento:'#b9bcc4',arena:'#e8d6a4',agua:'#4fb3ff'};
 const GR={pasto:'#7fcf7d',tierra:'#c9a56b',cemento:'#b9bcc4',arena:'#e8d6a4'};
-const TC={quincho:'#e8d6b0',casa:'#f0e6d2',bano:'#dfe8ef',arbol:'#2f8f4e',piscina:'#4fb3ff',otro:'#9a9a9a'};
+const TC={zona:'#9a9a9a',quincho:'#e8d6b0',casa:'#f0e6d2',bano:'#dfe8ef',arbol:'#2f8f4e',piscina:'#4fb3ff',otro:'#9a9a9a'};
 const obstSvg=o=>o.t==='arbol'?`<circle cx="${o.x}" cy="${o.z}" r="${Math.max(o.w,o.d)*.75}" fill="${TC.arbol}" opacity=".9"/>`
-  :`<rect x="${o.x-o.w/2}" y="${o.z-o.d/2}" width="${o.w}" height="${o.d}" rx="${o.t==='piscina'?.3:0}" fill="${TC[o.t]||TC.otro}" stroke="#25265E" stroke-width=".06" transform="rotate(${-o.r*180/Math.PI} ${o.x} ${o.z})"/>`;
+  :`<rect x="${o.x-o.w/2}" y="${o.z-o.d/2}" width="${o.w}" height="${o.d}" rx="${o.t==='piscina'?.3:0}" fill="${TXC[o.tex]||TC[o.t]||TC.otro}"${o.solid===false?' fill-opacity=".8" stroke-dasharray=".4 .3"':''} stroke="#25265E" stroke-width=".06" transform="rotate(${-o.r*180/Math.PI} ${o.x} ${o.z})"/>`;
 const svgPlan=r=>{
   const W=TERR.w,D=TERR.d;
   const rects=(r.layout||[]).map(p=>{const it=byId(p.id);if(!it)return '';const col='#'+it.color.toString(16).padStart(6,'0');return it.shape==='pool'?`<circle cx="${p.x}" cy="${p.z}" r="${it.w/2}" fill="${col}"/>`:`<rect x="${p.x-it.w/2}" y="${p.z-it.d/2}" width="${it.w}" height="${it.d}" fill="${col}" transform="rotate(${-p.rot*180/Math.PI} ${p.x} ${p.z})"/>`}).join('');
@@ -133,9 +134,10 @@ $('#svcForm').addEventListener('submit',e=>{
 
 /* ---------- editor del terreno ---------- */
 const TE={t:null,sel:null,dirty:false,pPhoto:null,pModel:null,photoPrev:''};
-const DEF_SIZE={quincho:[6,4],casa:[5,4],bano:[3,3],arbol:[1.6,1.6],piscina:[6,3],otro:[2,2]};
+const DEF_SIZE={zona:[8,5],quincho:[6,4],casa:[5,4],bano:[3,3],arbol:[1.6,1.6],piscina:[6,3],otro:[2,2]};
 const TT=DK.TERRAIN_TYPES;
 $('#tGround').innerHTML=Object.entries(DK.GROUNDS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
+$('#eTex').innerHTML='<option value="">Sin textura</option>'+Object.entries(DK.TEXTURES).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 $('#eType').innerHTML=$('#eT').innerHTML=Object.entries(TT).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 if(API.mode==='demo'){$('#tModel').disabled=true;$('#tModelNote').textContent='Los modelos 3D del terreno se pueden subir cuando conectes la base de datos (Supabase). En modo demo se usa el terreno dibujado.'}
 const teItem=id=>TE.t.items.find(o=>o.id===id);
@@ -154,15 +156,15 @@ function teDraw(){
   if(t.fence){const gap=Math.min(4,W/2),a=-W/2,b=W/2,y0=-D/2,y1=D/2;
     h+=`<path d="M${a} ${y1}V${y0}H${b}V${y1}H${gap/2}M${-gap/2} ${y1}H${a}" stroke="#fff" stroke-width=".18" fill="none"/>`;
     h+=`<text x="0" y="${y1+1.1}" font-size=".8" text-anchor="middle" fill="#25265E" font-weight="700">ENTRADA</text>`}
-  t.items.forEach(o=>{
+  t.items.slice().sort((a,b)=>(a.solid===false?0:1)-(b.solid===false?0:1)).forEach(o=>{
     const body=o.t==='arbol'?`<circle r="${Math.max(o.w,o.d)*.75}" fill="${TC.arbol}" opacity=".9"/><circle r=".25" fill="#7a5230"/>`
-      :`<rect x="${-o.w/2}" y="${-o.d/2}" width="${o.w}" height="${o.d}" rx="${o.t==='piscina'?.3:0}" fill="${TC[o.t]||TC.otro}" stroke="#25265E" stroke-width=".06"/>`;
+      :`<rect x="${-o.w/2}" y="${-o.d/2}" width="${o.w}" height="${o.d}" rx="${o.t==='piscina'?.3:0}" fill="${TXC[o.tex]||TC[o.t]||TC.otro}"${o.solid===false?' fill-opacity=".8" stroke-dasharray=".4 .3"':''} stroke="#25265E" stroke-width=".06"/>`;
     h+=`<g class="it${o.id===TE.sel?' sel':''}" data-id="${esc(o.id)}" transform="translate(${o.x} ${o.z}) rotate(${-o.rot})">${body}<text y=".3" font-size=".85" text-anchor="middle" fill="#25265E" stroke="#fff" stroke-width=".22" paint-order="stroke" style="pointer-events:none" transform="rotate(${o.rot})">${esc(o.name)}</text></g>`});
   svg.innerHTML=h;
 }
 function teSel(){
   const o=TE.sel&&teItem(TE.sel),f=$('#eForm');f.hidden=!o;if(!o)return;
-  $('#eName').value=o.name;$('#eT').value=o.t;$('#eW').value=o.w;$('#eD').value=o.d;$('#eRot').value=o.rot;$('#eX').value=o.x;$('#eZ').value=o.z;
+  $('#eName').value=o.name;$('#eT').value=o.t;$('#eTex').value=o.tex||'';$('#eSolid').value=o.solid===false?'0':'1';$('#eW').value=o.w;$('#eD').value=o.d;$('#eRot').value=o.rot;$('#eX').value=o.x;$('#eZ').value=o.z;
 }
 const svgPt=e=>{const s=$('#tePlan'),p=s.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const m=s.getScreenCTM();return m?p.matrixTransform(m.inverse()):{x:0,y:0}};
 let drag=null;
@@ -179,11 +181,12 @@ $('#tePlan').addEventListener('pointermove',e=>{
 const endDrag=()=>{drag=null};$('#tePlan').addEventListener('pointerup',endDrag);$('#tePlan').addEventListener('pointercancel',endDrag);
 // campos del elemento seleccionado
 const bindEl=(id,fn)=>$('#'+id).addEventListener('change',()=>{const o=TE.sel&&teItem(TE.sel);if(!o)return;fn(o,$('#'+id));TE.dirty=true;TE.t=DK.sanitizeTerrain(TE.t);teDraw();teSel()});
+bindEl('eTex',(o,i)=>{o.tex=i.value});bindEl('eSolid',(o,i)=>{o.solid=i.value!=='0'});
 bindEl('eName',(o,i)=>{o.name=i.value.trim()||TT[o.t]});bindEl('eT',(o,i)=>{o.t=i.value});
 bindEl('eW',(o,i)=>{o.w=+i.value});bindEl('eD',(o,i)=>{o.d=+i.value});bindEl('eRot',(o,i)=>{o.rot=+i.value||0});bindEl('eX',(o,i)=>{o.x=+i.value});bindEl('eZ',(o,i)=>{o.z=+i.value});
 $('#eAdd').onclick=()=>{
   const k=$('#eType').value,[w,d]=DEF_SIZE[k]||[2,2];if(TE.t.items.length>=60){toast('Ya hay demasiados elementos');return}
-  const o={id:'e'+Date.now().toString(36),t:k,name:TT[k],x:0,z:0,w,d,rot:0};TE.t.items.push(o);TE.sel=o.id;TE.dirty=true;teDraw();teSel();
+  const o={id:'e'+Date.now().toString(36),t:k,name:TT[k],x:0,z:0,w,d,rot:0,tex:k==='zona'?'pasto':'',solid:k!=='zona'};TE.t.items.push(o);TE.sel=o.id;TE.dirty=true;teDraw();teSel();
 };
 $('#eDel').onclick=()=>{TE.t.items=TE.t.items.filter(o=>o.id!==TE.sel);TE.sel=null;TE.dirty=true;teDraw();teSel()};
 // medidas, suelo y cerco

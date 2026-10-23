@@ -162,6 +162,7 @@ En el panel de administración, sección **Terreno**, puedes dejar el simulador 
 - **Medidas:** ancho y largo en metros (de 8 a 80 y de 6 a 60). El precio de la parcela y las medidas que ve el cliente se actualizan solos.
 - **Suelo:** pasto, tierra, cemento o arena. **Cerco:** con o sin.
 - **Elementos fijos** (quincho, casa o bodega, baños, árboles, piscina fija, otros): se agregan con el botón, se **arrastran en el plano** hasta su lugar y se ajustan con medidas y giro. Los juegos no se pueden poner encima de ellos.
+- **Textura y sólido/intangible (cada elemento):** elige textura (pasto, pasto sintético, tierra, madera, cemento, arena o agua) y si es **sólido** (los juegos no se pueden poner encima, como una casa) o **intangible** (solo decora, los juegos sí se pueden poner encima, como una zona de pasto). El tipo **Zona de suelo** sirve para pintar áreas de pasto, madera, etc.; nace intangible. En el plano, lo intangible se ve con borde punteado.
 - **Entrada:** siempre es la parte de abajo del plano.
 
 **Atajo para Divertí Kids:** el botón **Cargar mi parcela (según foto satelital)** deja el plano dibujado desde tu foto satelital (48 × 44 m aprox., tierra, cerco, mini canchas, quincho, casa y cocina, baños, piscina, zona de helados y el acceso de vehículos donde no van juegos). Las medidas son aproximadas: ajusta cada elemento arrastrándolo o con sus medidas y pulsa **Guardar terreno**. Los juegos suelen ir en el pasto sintético, que queda libre.
@@ -188,6 +189,7 @@ node pruebas/sitio-demo.test.mjs                             # recorrido complet
 node pruebas/sitio-flow.test.mjs                             # recorrido con pago en línea (base simulada)
 node pruebas/terreno.test.mjs                                # editor del terreno, guardado y uso en el sitio
 node pruebas/parcela-diverti.test.mjs                        # botón "Cargar mi parcela"
+node pruebas/texturas.test.mjs                               # texturas y sólido/intangible
 node pruebas/terreno-3d.test.mjs                             # qué se dibuja en el 3D según el terreno (con 3D simulado)
 ```
 

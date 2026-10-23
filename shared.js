@@ -37,7 +37,8 @@ const ALL=[...CAT];            // todos los servicios (incluye los eliminados, p
 const byId=id=>ALL.find(i=>i.id===id);
 const DESIGN=CAT.filter(i=>i.id!=='parcela');
 /* ----- Terreno (la parcela): medidas, suelo, cerco, foto aérea, modelo 3D y elementos fijos (quincho, árboles...) ----- */
-const TERRAIN_TYPES={quincho:'Quincho',casa:'Casa o bodega',bano:'Baños',arbol:'Árbol',piscina:'Piscina fija',otro:'Otro obstáculo'};
+const TERRAIN_TYPES={quincho:'Quincho',casa:'Casa o bodega',bano:'Baños',arbol:'Árbol',piscina:'Piscina fija',otro:'Otro obstáculo',zona:'Zona de suelo (pasto, madera…)'};
+const TEXTURES={pasto:'Pasto',pastosint:'Pasto sintético',tierra:'Tierra',madera:'Madera (deck)',cemento:'Cemento',arena:'Arena',agua:'Agua'};
 const GROUNDS={pasto:'Pasto',tierra:'Tierra',cemento:'Cemento o pavimento',arena:'Arena'};
 const DEFAULT_TERRAIN={w:30,d:20,ground:'pasto',fence:true,photo:'',model:'',modelRot:0,items:[
   {id:'q1',t:'quincho',name:'Quincho',x:-11.5,z:-7.5,w:6,d:4,rot:0},
@@ -48,8 +49,9 @@ const DEFAULT_TERRAIN={w:30,d:20,ground:'pasto',fence:true,photo:'',model:'',mod
 const PRESET_DIVERTI={w:48,d:44,ground:'tierra',fence:true,photo:'',model:'',modelRot:0,items:[
   {id:'c1',t:'otro',name:'Mini canchas',x:-12.9,z:11.7,w:22,d:14,rot:0},
   {id:'v1',t:'otro',name:'Acceso vehículos (sin juegos)',x:3,z:18,w:4,d:8,rot:0},
-  {id:'q1',t:'quincho',name:'Quincho',x:15.8,z:1.7,w:16,d:6,rot:0},
-  {id:'h1',t:'otro',name:'Zona de pasto (máquinas de helado)',x:9.2,z:-8.8,w:12,d:9,rot:0},
+  {id:'q1',t:'quincho',name:'Quincho',x:15.8,z:1.7,w:16,d:6,rot:0,tex:'madera'},
+  {id:'s1',t:'zona',name:'Pasto sintético (juegos y mesas)',x:-9.2,z:-2.5,w:24,d:12,rot:0,tex:'pastosint',solid:false},
+  {id:'h1',t:'zona',name:'Pasto (máquinas de helado)',x:9.2,z:-8.8,w:12,d:9,rot:0,tex:'pasto',solid:false},
   {id:'k1',t:'casa',name:'Casa y cocina',x:-12.9,z:-15,w:18,d:8,rot:0},
   {id:'b1',t:'bano',name:'Baños',x:-1.5,z:-16.5,w:3,d:3,rot:0},
   {id:'p1',t:'piscina',name:'Piscina',x:18.3,z:-14.2,w:7,d:11,rot:0}]};
@@ -60,7 +62,7 @@ function sanitizeTerrain(t){
   const items=(Array.isArray(t.items)?t.items:D.items).slice(0,60).map((o,i)=>({
     id:String(o.id||('e'+i)).slice(0,20),t:TERRAIN_TYPES[o.t]?o.t:'otro',name:String(o.name||TERRAIN_TYPES[o.t]||'Obstáculo').slice(0,30),
     x:Math.round(num(o.x,-w/2,w/2,0)*10)/10,z:Math.round(num(o.z,-d/2,d/2,0)*10)/10,
-    w:Math.round(num(o.w,.3,40,1.6)*10)/10,d:Math.round(num(o.d,.3,40,1.6)*10)/10,rot:Math.round(num(o.rot,-360,360,0))}));
+    w:Math.round(num(o.w,.3,40,1.6)*10)/10,d:Math.round(num(o.d,.3,40,1.6)*10)/10,rot:Math.round(num(o.rot,-360,360,0)),tex:TEXTURES[o.tex]?o.tex:'',solid:o.solid!==false}));
   return {w,d,ground:GROUNDS[t.ground]?t.ground:D.ground,fence:t.fence!==false,photo:String(t.photo||''),model:String(t.model||''),
     modelRot:[0,90,180,270].includes(+t.modelRot)?+t.modelRot:0,items};
 }
@@ -71,13 +73,13 @@ function applyTerrain(raw){
   const t=sanitizeTerrain(raw);
   Object.assign(TERR,{w:t.w,d:t.d,ground:t.ground,fence:t.fence,photo:t.photo,model:t.model,modelRot:t.modelRot});
   OBST.length=0;
-  t.items.forEach(o=>OBST.push({id:o.id,t:o.t,name:o.name,x:o.x,z:o.z,w:o.w,d:o.d,r:o.rot*Math.PI/180}));
+  t.items.forEach(o=>OBST.push({id:o.id,t:o.t,name:o.name,x:o.x,z:o.z,w:o.w,d:o.d,r:o.rot*Math.PI/180,tex:o.tex,solid:o.solid}));
   const p=ALL.find(i=>i.id==='parcela');
   if(p){p.w=t.w;p.d=t.d;p.desc=String(p.desc||'').replace(/\d+(?:[.,]\d+)? × \d+(?:[.,]\d+)? m/,t.w+' × '+t.d+' m')}
   return t;
 }
 const terrainOf=()=>sanitizeTerrain({w:TERR.w,d:TERR.d,ground:TERR.ground,fence:TERR.fence,photo:TERR.photo,model:TERR.model,modelRot:TERR.modelRot,
-  items:OBST.map(o=>({id:o.id,t:o.t,name:o.name,x:o.x,z:o.z,w:o.w,d:o.d,rot:Math.round(o.r*180/Math.PI)}))});
+  items:OBST.map(o=>({id:o.id,t:o.t,name:o.name,x:o.x,z:o.z,w:o.w,d:o.d,rot:Math.round(o.r*180/Math.PI),tex:o.tex,solid:o.solid}))});
 const terrainFromRow=x=>!x?null:{w:x.ancho,d:x.largo,ground:x.suelo,fence:x.cerco,photo:x.foto||'',model:x.modelo3d||'',modelRot:x.modelo_rot||0,items:x.elementos};
 applyTerrain(DEFAULT_TERRAIN);   // terreno de ejemplo hasta que se cargue el real
 const terrainRow=t=>({id:1,ancho:t.w,largo:t.d,suelo:t.ground,cerco:t.fence,foto:t.photo||null,modelo3d:t.model||null,modelo_rot:t.modelRot||0,elementos:t.items});
@@ -327,5 +329,5 @@ const API={
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI};
 })();

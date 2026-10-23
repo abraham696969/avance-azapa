@@ -170,12 +170,27 @@ function groundCanvas(){
 }
 const ELEM={ // tipo -> [alto de las paredes, color paredes, color techo]
   quincho:[2.4,0xe8d6b0,0xb5452f],casa:[2.8,0xf0e6d2,0x8a4b3a],bano:[2.4,0xdfe8ef,0x5b7080]};
+const TEXPAL={pasto:['#7fcf7d','#6fbf6d','#8fdb8c'],pastosint:['#3fae4a','#37a043','#49b955'],tierra:['#c9a56b','#bb975c','#d6b47c'],madera:['#9a6a3b','#8a5c31','#a97a49'],cemento:['#b9bcc4','#aeb1b9','#c6c9d0'],arena:['#e8d6a4','#dfcb94','#f0e0b6'],agua:['#4fb3ff','#44a6f2','#66c2ff']};
+function texCanvas(key,w,d){
+  const K=16,c=document.createElement('canvas');c.width=Math.max(8,Math.round(w*K));c.height=Math.max(8,Math.round(d*K));const t=c.getContext('2d'),P=TEXPAL[key]||TEXPAL.cemento;
+  t.fillStyle=P[0];t.fillRect(0,0,c.width,c.height);let s=7+key.length*13;const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
+  if(key==='madera'){const pw=Math.round(.18*K*2);for(let x=0;x<c.width;x+=pw){t.fillStyle=P[(x/pw)%2?1:2];t.fillRect(x,0,pw-1,c.height)}}
+  else if(key==='pastosint'){const sw=Math.round(1.2*K);for(let y=0;y<c.height;y+=sw){t.fillStyle=P[(y/sw)%2?1:2];t.fillRect(0,y,c.width,sw)}}
+  else if(key==='agua'){t.strokeStyle='rgba(255,255,255,.35)';t.lineWidth=1;for(let y=6;y<c.height;y+=12){t.beginPath();t.moveTo(0,y);for(let x=0;x<=c.width;x+=8)t.lineTo(x,y+Math.sin(x/8)*2);t.stroke()}}
+  else{for(let i=0;i<c.width*c.height/30;i++){t.fillStyle=P[1+(rnd()>.5?1:0)];t.fillRect(rnd()*c.width,rnd()*c.height,2,2)}}
+  return c;
+}
+const texMat=(key,w,d)=>new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(texCanvas(key,w,d))});
+function slab(w,d,key,h,y,fallback){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),key?texMat(key,w,d):mat(fallback||0x9a9a9a));m.position.set(0,y+h/2,0);m.receiveShadow=true;return m}
 function elementMesh(o){
   const g=new THREE.Group(),w=o.w,d=o.d;let top=1.2;
-  if(o.t==='arbol'){const k=Math.max(w,d)/1.6;g.add(cyl(.22*k,.28*k,1.6*k,0x7a5230,0,0,0,10));const cr=new THREE.Mesh(new THREE.SphereGeometry(1.2*k,14,10),mat(0x2f8f4e));cr.position.y=2.6*k;cr.castShadow=true;g.add(cr);top=3.8*k}
+  const flat=o.t==='zona'||(o.t==='otro'&&o.solid===false);
+  if(flat){g.add(slab(w,d,o.tex,.06,0));top=.1}
+  else if(o.t==='arbol'){const k=Math.max(w,d)/1.6;g.add(cyl(.22*k,.28*k,1.6*k,0x7a5230,0,0,0,10));const cr=new THREE.Mesh(new THREE.SphereGeometry(1.2*k,14,10),mat(0x2f8f4e));cr.position.y=2.6*k;cr.castShadow=true;g.add(cr);top=3.8*k}
   else if(ELEM[o.t]){const [h,wc,rc]=ELEM[o.t];g.add(box(w,h,d,wc));g.add(box(w+.6,.4,d+.6,rc,0,h,0));top=h+.4}
   else if(o.t==='piscina'){g.add(box(w,.5,d,0xeeeeee));g.add(box(Math.max(.1,w-.4),.05,Math.max(.1,d-.4),0x4fb3ff,0,.48,0));top=.6}
-  else{g.add(box(w,1.2,d,0x9a9a9a))}
+  else{g.add(o.tex?slab(w,d,o.tex,1.2,0):box(w,1.2,d,0x9a9a9a))}
+  if(o.tex&&!flat&&o.t!=='arbol'&&o.t!=='otro')g.add(slab(w+.4,d+.4,o.tex,.04,0));
   g.position.set(o.x,0,o.z);g.rotation.y=-o.r;
   if(o.t!=='arbol'&&o.name){const l=makeLabel(o.name);l.position.set(o.x,top+1.4,o.z);g.userData.label=l}
   return g;
@@ -227,7 +242,7 @@ function corners(x,z,w,d,r){const c=Math.cos(r),s=Math.sin(r),hw=w/2,hd=d/2;retu
 function sat(A,B){for(const P of [A,B]){for(let i=0;i<4;i++){const p=P[i],q=P[(i+1)%4],ax=-(q[1]-p[1]),az=q[0]-p[0];let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;A.forEach(v=>{const t=v[0]*ax+v[1]*az;a0=Math.min(a0,t);a1=Math.max(a1,t)});B.forEach(v=>{const t=v[0]*ax+v[1]*az;b0=Math.min(b0,t);b1=Math.max(b1,t)});if(a1<=b0+.02||b1<=a0+.02)return false}}return true}
 function boundsOK(x,z,w,d,r){const c=Math.abs(Math.cos(r)),s=Math.abs(Math.sin(r));return Math.abs(x)+(c*w+s*d)/2<=TERR.w/2-.15&&Math.abs(z)+(s*w+c*d)/2<=TERR.d/2-.15}
 function collides(x,z,it,r,skip){const A=corners(x,z,it.w,it.d,r);
-  for(const o of OBST)if(sat(A,corners(o.x,o.z,o.w,o.d,o.r)))return true;
+  for(const o of OBST)if(o.solid!==false&&sat(A,corners(o.x,o.z,o.w,o.d,o.r)))return true;
   for(const p of S.placed){if(p.uid===skip)continue;const q=byId(p.id);if(sat(A,corners(p.x,p.z,q.w,q.d,p.rot)))return true}return false}
 function validAt(x,z,it,r,skip){return boundsOK(x,z,it.w,it.d,r)&&!collides(x,z,it,r,skip)}
 function findSpot(it){const zm=Math.max(0,TERR.d/2-2),xm=Math.max(0,TERR.w/2-2);for(let z=-zm;z<=zm;z+=1){for(let x=-xm;x<=xm;x+=1){if(validAt(x,z,it,0,-1))return [x,z]}}return null}
