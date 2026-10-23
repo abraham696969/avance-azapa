@@ -4,8 +4,8 @@
 <title>Divertí Kids</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F4F6FB" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0C1430" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F7F6FC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12113A" media="(prefers-color-scheme: dark)">
 <meta name="application-name" content="Divertí Kids">
 <meta name="apple-mobile-web-app-title" content="Divertí Kids">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,11 +13,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <a class="logo" href="#inicio"><i></i>Divertí Kids</a>
+  <a class="logo" href="#inicio" aria-label="Divertí Kids Arica, inicio"><img class="logo-img" src="logo-sm.png" srcset="logo-sm.png 1x, logo.png 3x" width="56" height="56" alt="Divertí Kids Arica"></a>
   <nav class="main" aria-label="Principal">
     <a href="#servicios">Servicios</a><a href="#fecha">Fecha</a><a href="#simulador">Simulador 3D</a><a href="#reservar">Reservar</a>
   </nav>
@@ -27,6 +29,7 @@
 <main class="wrap" id="inicio">
   <div class="hero">
     <div>
+      <img class="hero-logo" src="logo.png" width="176" height="176" alt="Logo de Divertí Kids Arica" fetchpriority="high">
       <p class="eyebrow">Divertí Kids · Eventos infantiles · Valle de Azapa, Arica</p>
       <h1 style="margin-top:12px">Mira tu fiesta en la parcela <mark>antes de arrendar</mark></h1>
       <p class="lead">Elige la fecha, arrastra los juegos sobre un modelo 3D del terreno y reserva con un abono en línea. Todo en menos de 5 minutos.</p>
@@ -133,7 +136,7 @@
 
   <footer>
     <span>Divertí Kids · Valle de Azapa, Arica. Nombre y datos de contacto de ejemplo.</span>
-    <span>Pagos en ambiente de pruebas: no se cobra dinero. · <a href="admin.html" rel="nofollow" style="color:inherit">Administración</a></span>
+    <span><span id="payNote">Pagos en ambiente de pruebas: no se cobra dinero.</span> · <a href="admin.html" rel="nofollow" style="color:inherit">Administración</a></span>
   </footer>
 </main>
 
@@ -143,6 +146,7 @@
     <h3 id="payT">Pagar abono</h3>
     <p class="price num" id="payAmt"></p>
     <p class="sandbox">Ambiente de pruebas. Usa la tarjeta ya cargada. Con 4000 0000 0000 0002 se simula un pago rechazado.</p>
+    <div id="cardBlock">
     <div class="methods" id="methods">
       <label><input type="radio" name="pm" value="Webpay Plus" checked>Webpay Plus</label>
       <label><input type="radio" name="pm" value="Flow">Flow</label>
@@ -150,6 +154,8 @@
     </div>
     <div class="field"><label for="cardN">Número de tarjeta</label><input id="cardN" inputmode="numeric" value="4051 8856 0044 6623"></div>
     <div class="two"><div class="field"><label for="cardE">Vencimiento</label><input id="cardE" value="12/30"></div><div class="field"><label for="cardC">CVV</label><input id="cardC" value="123" inputmode="numeric"></div></div>
+    </div>
+    <p class="sandbox" id="onlineNote" hidden>Te llevaremos a <b>Flow</b> para pagar tu abono con tarjeta u otros medios habilitados. Tu cupo queda guardado por 30 minutos mientras pagas.</p>
     <p id="payMsg" class="note" style="font-weight:600" hidden></p>
     <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
       <button class="btn ghost" id="payCancel" type="button">Cancelar</button>

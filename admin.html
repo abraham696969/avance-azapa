@@ -5,12 +5,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#F4F6FB" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0C1430" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F7F6FC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12113A" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-title" content="DK Admin">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,7 +20,7 @@
 <!-- Acceso -->
 <div class="login" id="loginView" hidden>
   <form class="panel f" id="loginForm" novalidate>
-    <a class="logo" href="index.html"><i></i>Divertí Kids</a>
+    <a class="logo" href="index.html" aria-label="Volver al sitio de Divertí Kids"><img class="logo-img big" src="logo.png" width="112" height="112" alt="Divertí Kids Arica"></a>
     <div><p class="eyebrow">Acceso del equipo</p><h1>Administración</h1></div>
     <div class="demo-hint" id="demoHint" hidden>
       <b>Modo demo.</b> Aún no hay base de datos conectada. Entra con<br>
@@ -36,7 +38,7 @@
 <!-- Panel -->
 <div id="panelView" hidden>
   <header class="top"><div class="wrap">
-    <a class="logo" href="admin.html"><i></i>Divertí Kids</a>
+    <a class="logo" href="admin.html" aria-label="Divertí Kids, administración"><img class="logo-img" src="logo-sm.png" width="56" height="56" alt="Divertí Kids Arica"></a>
     <span class="modebadge" id="modeBadge"></span>
     <div class="userbar"><span id="who"></span><button class="btn sm" id="logout" type="button">Cerrar sesión</button></div>
   </div></header>
@@ -58,9 +60,36 @@
           <ul class="lines" id="blockList" style="margin-top:12px"></ul>
         </div>
         <div class="panel">
-          <h3>Precios y stock del catálogo</h3>
-          <div class="tablewrap" style="margin-top:8px"><table style="min-width:420px"><thead><tr><th>Servicio</th><th>Precio</th><th>Stock</th></tr></thead><tbody id="priceBody"></tbody></table></div>
+          <h3 id="svcFormT">Agregar servicio</h3>
+          <form class="f" id="svcForm" style="margin-top:12px" novalidate>
+            <input type="hidden" id="sId">
+            <div class="field"><label for="sName">Nombre</label><input id="sName" maxlength="60" placeholder="Ej.: Castillo inflable grande"></div>
+            <div class="two">
+              <div class="field"><label for="sCat">Categoría</label><select id="sCat"></select></div>
+              <div class="field"><label for="sShape">Tipo en el simulador 3D</label><select id="sShape"></select></div>
+            </div>
+            <div class="field"><label for="sDesc">Descripción</label><input id="sDesc" maxlength="120" placeholder="Una línea para el catálogo"></div>
+            <div class="two">
+              <div class="field"><label for="sPrice">Precio por evento (CLP)</label><input id="sPrice" type="number" min="0" step="1000" inputmode="numeric"></div>
+              <div class="field"><label for="sStock">Unidades disponibles</label><input id="sStock" type="number" min="0" step="1" inputmode="numeric"></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="sW">Ancho (m)</label><input id="sW" type="number" min="0.3" max="30" step="0.1" inputmode="decimal"></div>
+              <div class="field"><label for="sD">Largo (m)</label><input id="sD" type="number" min="0.3" max="20" step="0.1" inputmode="decimal"></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="sH">Alto (m)</label><input id="sH" type="number" min="0.2" max="8" step="0.1" inputmode="decimal"></div>
+              <div class="field"><label for="sColor">Color en el simulador</label><input id="sColor" type="color" value="#3d7bff" style="padding:2px;height:44px"></div>
+            </div>
+            <p class="note" id="sErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit" id="sSave">Guardar servicio</button><button class="btn ghost" type="button" id="sCancel" hidden>Cancelar edición</button></div>
+          </form>
         </div>
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <h3>Servicios y precios</h3>
+        <p class="note" style="margin:4px 0 8px">Los cambios de precio y stock se guardan al salir del campo. "Eliminar" oculta el servicio del sitio; las reservas antiguas lo siguen mostrando.</p>
+        <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Servicio</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Medidas</th><th></th></tr></thead><tbody id="priceBody"></tbody></table></div>
       </div>
     </section>
     <footer><span>Divertí Kids · Panel interno</span><span><a href="index.html" style="color:inherit">Ver sitio de clientes</a></span></footer>

@@ -1,20 +1,22 @@
 /* Layout: una sola página con barra superior fija; secciones en el orden del flujo del cliente
    (servicios, fecha, simulador 3D, reserva y pago); panel admin y chatbot flotante al final. */
 :root{
-  --bg:#F4F6FB; --surface:#FFFFFF; --ink:#12203F; --muted:#56638A; --line:#D9E0EE;
-  --accent:#FFC21A; --on-accent:#12203F; --pink:#E8397F; --teal:#0C9E90; --blue:#3552F0;
-  --ok:#0C9E90; --warn:#B87400; --bad:#D8344A; --soft:#EAEEF8;
+  /* Paleta tomada del logo: verde #00A85A · rosa #EA278D · índigo #3E4095 · mostaza #FECD28 · lima #8FCB51 · cian #67C8D8 */
+  --bg:#F7F6FC; --surface:#FFFFFF; --ink:#25265E; --muted:#5C5E93; --line:#DEDDF0;
+  --accent:#FECD28; --on-accent:#25265E; --pink:#EA278D; --teal:#67C8D8; --blue:#3E4095;
+  --ok:#00844A; --warn:#B87400; --bad:#D8344A; --soft:#EEEDFA;
+  --green:#00A85A; --indigo:#3E4095; --lime:#8FCB51; --cyan:#67C8D8;
   --f-display:'Baloo 2','Trebuchet MS',system-ui,sans-serif;
   --f-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0C1430; --surface:#152046; --ink:#EEF1FA; --muted:#9CA8CB; --line:#27355F;
-  --accent:#FFC21A; --on-accent:#12203F; --pink:#FF6FA5; --teal:#3CCDBE; --blue:#93A5FF;
-  --ok:#3CCDBE; --warn:#F2B13C; --bad:#FF6B7F; --soft:#1B2958; color-scheme:dark}}
+  --bg:#12113A; --surface:#1D1C54; --ink:#F2F1FC; --muted:#B3B4DB; --line:#35357C;
+  --accent:#FECD28; --on-accent:#25265E; --pink:#FF5FB0; --teal:#67C8D8; --blue:#AEB0FF;
+  --ok:#8FCB51; --warn:#F2B13C; --bad:#FF6B7F; --soft:#272670; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0C1430; --surface:#152046; --ink:#EEF1FA; --muted:#9CA8CB; --line:#27355F;
-  --accent:#FFC21A; --on-accent:#12203F; --pink:#FF6FA5; --teal:#3CCDBE; --blue:#93A5FF;
-  --ok:#3CCDBE; --warn:#F2B13C; --bad:#FF6B7F; --soft:#1B2958; color-scheme:dark}
+  --bg:#12113A; --surface:#1D1C54; --ink:#F2F1FC; --muted:#B3B4DB; --line:#35357C;
+  --accent:#FECD28; --on-accent:#25265E; --pink:#FF5FB0; --teal:#67C8D8; --blue:#AEB0FF;
+  --ok:#8FCB51; --warn:#F2B13C; --bad:#FF6B7F; --soft:#272670; color-scheme:dark}
 
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--f-body);
@@ -280,3 +282,37 @@ header.top{-webkit-backdrop-filter:saturate(1.4) blur(8px);backdrop-filter:satur
 .pw{position:relative}
 .back{font-size:.9rem;color:var(--muted)}
 @media(max-width:520px){.userbar span{display:none}}
+
+/* ===== Marca Divertí Kids (logo y colores) ===== */
+.logo{gap:0}
+.logo-img{display:block;width:56px;height:56px;border-radius:50%;flex:none}
+header.top .wrap{padding-block:6px}
+header.top{border-bottom:0}
+header.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;
+  background:linear-gradient(90deg,#00A85A 0 25%,#EA278D 25% 50%,#3E4095 50% 75%,#FECD28 75% 100%)}
+.hero-logo{display:block;width:clamp(120px,22vw,176px);height:auto;aspect-ratio:1;border-radius:50%;margin-bottom:18px;
+  box-shadow:0 10px 30px color-mix(in srgb,var(--indigo) 30%,transparent)}
+.hero h1 mark{background:linear-gradient(transparent 62%,var(--accent) 62% 92%,transparent 92%)}
+.eyebrow{color:var(--pink)}
+[data-theme="dark"] .eyebrow{color:var(--accent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .eyebrow{color:var(--accent)}}
+.muted .eyebrow,.panel .eyebrow,.metrics .eyebrow{color:var(--muted)}
+/* los 5 pasos de la portada toman los colores del logo */
+.steps li:nth-child(5n+1) b{background:var(--green);color:#fff}
+.steps li:nth-child(5n+2) b{background:var(--pink);color:#fff}
+.steps li:nth-child(5n+3) b{background:var(--indigo);color:#fff}
+.steps li:nth-child(5n+4) b{background:var(--accent);color:#25265E}
+.steps li:nth-child(5n+5) b{background:var(--cyan);color:#25265E}
+/* tarjetas del catálogo: franja superior de colores rotativos */
+.grid .card:nth-child(4n+1){border-top:4px solid var(--green)}
+.grid .card:nth-child(4n+2){border-top:4px solid var(--pink)}
+.grid .card:nth-child(4n+3){border-top:4px solid var(--indigo)}
+.grid .card:nth-child(4n+4){border-top:4px solid var(--accent)}
+.btn.primary{box-shadow:0 3px 0 color-mix(in srgb,var(--on-accent) 28%,transparent)}
+.btn.primary:active{transform:translateY(2px);box-shadow:none}
+.tab[aria-pressed="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.chatfab{background:#D81B7E;color:#fff}
+.login .logo-img.big{width:112px;height:112px;margin:0 auto}
+.login .panel{border-top:5px solid var(--pink)}
+@media(max-width:760px){.logo-img{width:48px;height:48px}}
+.login .logo{justify-content:center}

@@ -116,6 +116,8 @@ function build(it){
     case 'machine':
       g.add(box(w,h*.7,d,c));g.add(box(w*.8,h*.3,d*.8,it.top,0,h*.7,0));
       if(it.id==='algodon'){const s=new THREE.Mesh(new THREE.SphereGeometry(.42,16,12),mat(0xffd6e6));s.position.set(0,h+.1,0);g.add(s)}break;
+    case 'box':
+      g.add(box(w,h,d,c));break;
     case 'pool':
       g.add(cyl(w/2,w/2,h,0xeeeeee));const wt=cyl(w/2-.15,w/2-.15,h*.9,c,0,.05,0);g.add(wt);
       const wt2=new THREE.Mesh(new THREE.CircleGeometry(w/2-.15,32),new THREE.MeshLambertMaterial({color:0x7fd0ff}));wt2.rotation.x=-Math.PI/2;wt2.position.y=h+.01;g.add(wt2);break;
@@ -259,18 +261,27 @@ $('#clientForm').addEventListener('submit',e=>{
 });
 $('#payCancel').onclick=()=>$('#payOv').hidden=true;
 $('#payGo').onclick=async()=>{
-  const num=$('#cardN').value.replace(/\D/g,''),msg=$('#payMsg'),go=$('#payGo');msg.hidden=false;msg.style.color='var(--muted)';
-  if(num.length!==16){msg.style.color='var(--bad)';msg.textContent='El número de tarjeta debe tener 16 dígitos.';return}
-  go.disabled=true;msg.innerHTML='<span class="spin"></span> Procesando pago en el ambiente de pruebas…';
-  await new Promise(r=>setTimeout(r,1400));
-  if(num==='4000000000000002'){msg.style.color='var(--bad)';msg.textContent='Pago rechazado por el banco emisor. No se hizo ningún cargo. Prueba con otra tarjeta.';go.disabled=false;return}
+  const msg=$('#payMsg'),go=$('#payGo');msg.hidden=false;msg.style.color='var(--muted)';
+  const online=API.online;
+  const num=$('#cardN').value.replace(/\D/g,'');
+  if(!online&&num.length!==16){msg.style.color='var(--bad)';msg.textContent='El número de tarjeta debe tener 16 dígitos.';return}
+  go.disabled=true;
+  if(online)msg.innerHTML='<span class="spin"></span> Reservando tu cupo y preparando el pago…';
+  else{msg.innerHTML='<span class="spin"></span> Procesando pago en el ambiente de pruebas…';await new Promise(r=>setTimeout(r,1400));
+    if(num==='4000000000000002'){msg.style.color='var(--bad)';msg.textContent='Pago rechazado por el banco emisor. No se hizo ningún cargo. Prueba con otra tarjeta.';go.disabled=false;return}}
   if(issues().length){msg.style.color='var(--bad)';msg.textContent='Mientras pagabas cambió la disponibilidad. Revisa tu cotización.';go.disabled=false;return}
   const q=quote(),items={};q.lines.forEach(l=>{if(l.id!=='parcela')items[l.id]=l.qty});
   const client={name:$('#cName').value.trim(),email:$('#cMail').value.trim(),phone:$('#cPhone').value.trim(),guests:+$('#cGuests').value};
-  const method=document.querySelector('input[name=pm]:checked').value,txn='TBK-'+Math.floor(Math.random()*9e8+1e8);
+  const method=online?'Flow':document.querySelector('input[name=pm]:checked').value,txn=online?'':'TBK-'+Math.floor(Math.random()*9e8+1e8);
   const layout=S.placed.map(p=>({id:p.id,x:p.x,z:p.z,rot:p.rot}));
   try{
-    const res=await API.createReservation({date:S.date,slot:S.slot,client,items,parcela:S.parcela,layout,method,txn});
+    const res=await API.createReservation({date:S.date,slot:S.slot,client,items,parcela:S.parcela,layout,method,txn,online});
+    if(online){
+      // el cupo ya quedó guardado; ahora se lleva al cliente a pagar a Flow
+      const url=await API.startPayment(res.folio,res.codigo);
+      msg.innerHTML='<span class="spin"></span> Redirigiendo a Flow…';
+      location.href=url;return;
+    }
     const r={id:res.folio,date:S.date,slot:S.slot,client,items,parcela:S.parcela,status:res.estado,total:res.total,abono:res.abono,method,txn,layout};
     DB.res.push({date:r.date,slot:r.slot,items,parcela:r.parcela,status:r.status});
     lastRes=r;$('#payOv').hidden=true;showDone(r);refreshAll();
@@ -278,6 +289,29 @@ $('#payGo').onclick=async()=>{
     console.error(e);msg.style.color='var(--bad)';msg.textContent=(e&&e.message)||'No se pudo registrar la reserva. Intenta de nuevo.';go.disabled=false;
   }
 };
+/* Al volver desde Flow la dirección trae ?folio=...&c=... : se muestra el resultado del pago */
+async function showReturn(folio,codigo){
+  const area=$('#bookArea');
+  const panel=h=>{area.innerHTML=`<div class="panel" style="grid-column:1/-1;display:grid;gap:14px;max-width:760px">${h}</div>`};
+  const again='<div class="cta-row" style="margin:0"><a class="btn primary" href="index.html#fecha">Hacer otra reserva</a></div>';
+  panel('<div style="display:flex;gap:14px;align-items:center"><span class="spin"></span><b>Confirmando tu pago…</b></div>');
+  document.getElementById('reservar').scrollIntoView();
+  let st=null;
+  for(let i=0;i<8;i++){
+    try{st=await API.reservationStatus(folio,codigo)}catch(e){console.error(e);break}
+    if(!st||st.estado!=='por_pagar')break;
+    await new Promise(r=>setTimeout(r,2500));   // la confirmación de Flow puede tardar unos segundos
+  }
+  if(!st)return panel('<h3>No encontramos esa reserva</h3><p class="muted">Revisa el enlace o escríbenos y la buscamos con tu folio.</p>'+again);
+  const cuando=`${fmtDate(st.fecha)}, franja ${SLOTS[st.franja]?SLOTS[st.franja].n.toLowerCase():st.franja}`;
+  if(st.estado==='confirmada'||st.estado==='finalizada')
+    return panel(`<div style="display:flex;gap:16px;align-items:center"><div class="okmark">✓</div><div><h3>¡Pago recibido! Reserva ${esc(st.folio)} confirmada</h3><p class="muted">Abono de ${CLP(st.abono)} pagado con Flow. Tu fiesta quedó reservada para el ${cuando}. El saldo de ${CLP(st.total-st.abono)} se paga el día del evento.</p></div></div>`+again);
+  if(st.estado==='pendiente')
+    return panel(`<h3>Recibimos tu pago, reserva ${esc(st.folio)}</h3><p class="muted">El equipo debe revisar un detalle de tu reserva antes de confirmarla. Te contactaremos pronto.</p>`+again);
+  if(st.estado==='por_pagar')
+    return panel(`<h3>Aún no vemos tu pago, reserva ${esc(st.folio)}</h3><p class="muted">Si ya pagaste, la confirmación puede tardar unos minutos: recarga esta página en un rato. Tu cupo se guarda hasta que venza el plazo de pago.</p>`);
+  panel(`<h3>El pago no se completó</h3><p class="muted">Tu reserva ${esc(st.folio)} no quedó confirmada y el cupo se liberó. No se cobró nada si cancelaste el pago. Puedes intentarlo de nuevo.</p>`+again);
+}
 function showDone(r){
   const items=Object.entries(r.items).map(([k,v])=>`• ${byId(k).name} × ${v}`).join('\n');
   $('#bookArea').innerHTML=`<div class="panel" style="grid-column:1/-1;display:grid;gap:16px;max-width:760px">
@@ -290,13 +324,18 @@ function showDone(r){
 }
 
 /* ---------- chatbot ---------- */
-const WA='https://wa.me/56900000000';
-const waLink=`<a href="${WA}" target="_blank" rel="noopener">escribirnos por WhatsApp</a> (número de ejemplo +56 9 0000 0000)`;
+const NEG=window.DK_NEGOCIO||{};
+const waNum=String(NEG.whatsapp||'').replace(/\D/g,'')||'56900000000';
+const waLink=`<a href="https://wa.me/${waNum}" target="_blank" rel="noopener">escribirnos por WhatsApp</a>${NEG.whatsappVisible?' ('+esc(NEG.whatsappVisible)+')':''}`;
+const norm=t=>String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+// respuesta configurable: si el dueño la escribió en config.js se usa; si no, se deriva a una persona
+const cfgAns=(k,intro)=>NEG[k]?`${intro?intro+' ':''}${esc(NEG[k])}`:`${intro?intro+' ':''}Eso lo confirma una persona del equipo: puedes ${waLink}.`;
 function priceList(cat){return CAT.filter(i=>i.id!=='parcela'&&(!cat||i.cat===cat)).map(i=>`${esc(i.name)}: <b>${CLP(i.price)}</b>`).join('<br>')}
 function parseDate(t){
+  t=norm(t);
   let m=t.match(/(\d{1,2})\s*(?:de\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)/);let d,mo;
   if(m){d=+m[1];mo=MESES.indexOf(m[2]==='setiembre'?'septiembre':m[2])}
-  else{m=t.match(/(\d{1,2})[\/\-](\d{1,2})/);if(!m)return null;d=+m[1];mo=+m[2]-1}
+  else{m=t.match(/(\d{1,2})\/(\d{1,2})/);if(!m)return null;d=+m[1];mo=+m[2]-1}
   if(mo<0||mo>11||d<1||d>31)return null;let y=today.getFullYear();let dt=new Date(y,mo,d);if(dt<=today)dt=new Date(y+1,mo,d);if(dt.getMonth()!==mo)return null;return dt;
 }
 function availAnswer(dt){
@@ -306,35 +345,51 @@ function availAnswer(dt){
   const low=DESIGN.filter(i=>avail(i.id,ds,fr[0])===0).map(i=>i.name);
   return `El ${fmtDate(ds)} hay parcela libre en: <b>${fr.map(s=>SLOTS[s].n+' ('+SLOTS[s].h+')').join(' y ')}</b>.`+(low.length?`<br>Sin stock esa fecha: ${low.join(', ')}.`:'')+`<br><a href="#fecha" data-pick="${ds}">Elegir esta fecha</a>`;
 }
+// servicios nombrados en la pregunta (por palabras del nombre: "castillo", "tobogan", "piscina"...)
+function itemsIn(q){return DESIGN.filter(i=>norm(i.name).split(/\s+/).some(w=>w.length>3&&!['maquina','mesa','chica','grande','azucar'].includes(w)&&q.includes(w.replace(/s$/,''))))}
+// Cada intención: [id, expresión sobre el texto sin tildes, respuesta]. El orden importa: lo más específico va primero.
 const FAQ=[
- [/hola|buenas|buen d[ií]a|buenos|hey/,()=>'¡Hola! Soy el asistente de Divertí Kids. Puedo ayudarte con precios, disponibilidad por fecha, ubicación y cómo reservar.'],
- [/disponib|libre|queda|ocupad|fecha/,t=>{const d=parseDate(t);return d?availAnswer(d):'Dime la fecha (por ejemplo "25 de octubre" o "25/10") y te digo qué hay disponible.'}],
- [/inflable|castillo|tobog|cancha/,()=>'Inflables:<br>'+priceList('juegos').split('<br>').slice(0,3).join('<br>')+'<br>Puedes ver cómo caben en la parcela en el <a href="#simulador">simulador 3D</a>.'],
- [/taca|ping|juego/,()=>'Juegos y entretención:<br>'+priceList('juegos')],
- [/papas|algod|completo|comida|m[aá]quina|hot ?dog/,()=>'Máquinas de alimentos:<br>'+priceList('comida')],
- [/piscina|agua|pileta/,()=>'Piscinas:<br>'+priceList('piscinas')],
- [/parcela|local|recinto|lugar|espacio/,()=>`La parcela mide 30 × 20 m (medida referencial), tiene cerco, quincho y árboles. Arriendo: <b>${CLP(byId('parcela').price)}</b> por evento.`],
- [/precio|cu[aá]nto|valor|cuesta|tarifa|cotiz/,()=>'Precios por evento:<br>'+priceList()+`<br>Parcela: <b>${CLP(byId('parcela').price)}</b>. Tu cotización exacta aparece en <a href="#reservar">Reservar</a>.`],
- [/ubicaci|d[oó]nde|direcci|llegar|azapa|arica/,()=>'Estamos en el valle de Azapa, Arica. Te enviamos la dirección exacta y cómo llegar al confirmar la reserva.'],
- [/horario|hora|franja|turno|cu[aá]ndo/,()=>`Hay dos franjas por día: <b>Mañana ${SLOTS.manana.h}</b> y <b>Tarde ${SLOTS.tarde.h}</b>.`],
- [/pag|abono|tarjeta|webpay|flow|mercado/,()=>'Se paga un abono del 30% en línea (Webpay Plus, Flow o Mercado Pago). El saldo se paga el día del evento.'],
- [/reserv|arrend|contrat|c[oó]mo/,()=>'Para reservar: 1) elige la fecha, 2) arma tu distribución en el <a href="#simulador">simulador 3D</a>, 3) revisa la cotización y 4) paga el abono en <a href="#reservar">Reservar</a>.'],
- [/3d|simulador|distribu|mover/,()=>'En el <a href="#simulador">simulador 3D</a> arrastras los juegos por el terreno, los giras y ves si caben. Lo que dejes ahí pasa directo a tu cotización.'],
- [/condici|pol[ií]tica|cancel|devol|reembols|seguro|montaje/,()=>`Las condiciones de arriendo y cancelación las revisa una persona del equipo. Puedes ${waLink}.`],
- [/humano|persona|whatsapp|contacto|tel[eé]fono|ejecutiv|llamar/,()=>`Te derivo con el equipo: puedes ${waLink}.`],
- [/gracias|genial|perfecto|listo|ok\b/,()=>'¡De nada! Si necesitas algo más, aquí estoy.']
+ ['cancelacion',/(cancel|devol|reembols|cambiar (la )?fecha|cambio de fecha|modificar|reprogram|anular|arrepent)/,()=>cfgAns('cancelacion','Sobre cambios, cancelaciones y devoluciones:')],
+ ['stock',/(cuantos|cuantas|que cantidad|unidades|hay mas|tienen mas|quedan)/,q=>{const it=itemsIn(q);if(!it.length)return null;return 'Unidades en total:<br>'+it.map(i=>`${esc(i.name)}: <b>${i.stock}</b>`).join('<br>')+'<br>Cuántas quedan libres depende de la fecha: dime el día (por ejemplo "25 de octubre") y lo reviso.'}],
+ ['estado_reserva',/(mi reserva|estado de (mi|la) reserva|folio|ya pague|confirmaron|me llego|comprobante)/,()=>`Con tu folio (por ejemplo R-1006) una persona del equipo revisa el estado de tu reserva: puedes ${waLink}. Si pagaste en línea, al volver desde Flow ves la confirmación en la página.`],
+ ['montaje',/(montaj|instal|armar|retir[ao]|cuando llegan|a que hora (llegan|montan)|desmont)/,()=>cfgAns('montaje','Montaje y retiro:')],
+ ['electricidad',/(electric|enchuf|corriente|luz|generador|agua para|manguera|conexion)/,()=>cfgAns('electricidad','Requisitos de electricidad y agua:')],
+ ['boleta',/(boleta|factura|rut|comprobante de pago|documento tributario)/,()=>cfgAns('boleta','Boleta o factura:')],
+ ['edades',/(\bedad|\banos\b|seguridad|supervis|\bbebes?\b|adolescente|riesgo|seguro de)/,()=>cfgAns('edades','Edades y seguridad:')],
+ ['comida_propia',/(torta|comida propia|llevar (comida|torta|bebida)|traer (comida|torta)|musica|parlante|decoraci|alcohol|mascota)/,()=>cfgAns('comidaPropia','Sobre llevar torta, comida, música o decoración:')],
+ ['descuentos',/(descuento|promo|oferta|rebaja|paquete|combo|mas barato|convenio)/,()=>cfgAns('descuentos','Descuentos y promociones:')],
+ ['capacidad',/(cuantos ninos|capacidad|maximo de (personas|invitados|ninos)|cuantas personas|cuantos invitados|caben|numero de invitados|aforo)/,()=>`La parcela mide 30 × 20 m con cerco y quincho. En la reserva puedes indicar hasta <b>200 invitados</b>; en el <a href="#simulador">simulador 3D</a> ves cuánto espacio queda libre según los juegos que elijas. Para eventos grandes, conviene conversar con el equipo: puedes ${waLink}.`],
+ ['saldo',/(saldo|resto del (pago|dinero)|lo que falta|el dia del evento|pagar despues|70 ?%)/,()=>'El abono es el <b>30%</b> del total y se paga en línea para confirmar. El <b>70% restante</b> (el saldo) se paga el día del evento.'],
+ ['pago',/(pag[ao]r?|abono|tarjeta|credito|debito|transferencia|webpay|flow|mercado ?pago|medios? de pago|formas? de pago|efectivo)/,()=>'Se paga un abono del <b>30%</b> en línea'+(API.online?' a través de <b>Flow</b>, que acepta tarjetas y otros medios habilitados.':' (Webpay Plus, Flow o Mercado Pago).')+' El saldo se paga el día del evento.'],
+ ['ubicacion',/(ubicaci|donde (estan|queda|es)|direcci|llegar|como llego|mapa|azapa|arica|sector)/,()=>NEG.direccion?`Estamos en ${esc(NEG.direccion)}. También puedes ${waLink}.`:'Estamos en el valle de Azapa, Arica. Te enviamos la dirección exacta y cómo llegar al confirmar la reserva.'],
+ ['precios',/(precio|cuanto (cuesta|sale|vale|cobran)|valor|cuesta|tarifa|cotiz|presupuesto|costo)/,q=>{const it=itemsIn(q);if(it.length)return it.map(i=>`${esc(i.name)}: <b>${CLP(i.price)}</b> por evento`).join('<br>')+'<br>Tu cotización exacta aparece en <a href="#reservar">Reservar</a>.';return 'Precios por evento:<br>'+priceList()+`<br>Parcela: <b>${CLP((byId('parcela')||{price:0}).price)}</b>. Tu cotización exacta aparece en <a href="#reservar">Reservar</a>.`}],
+ ['incluye_parcela',/(parcela|recinto|local|espacio|quincho|cerco|incluye|arbol|estacionamiento|ba(n|ñ)os?)/,()=>`La parcela mide 30 × 20 m (medida referencial) y tiene cerco, quincho y árboles. Arriendo: <b>${CLP((byId('parcela')||{price:0}).price)}</b> por evento. Los juegos y máquinas se arriendan aparte.`],
+ ['inflables',/(inflable|castillo|tobog|cancha|salto)/,()=>'Inflables:<br>'+priceList('juegos').split('<br>').filter(l=>/inflable|castillo|tobog|cancha/i.test(l)).join('<br>')+'<br>Puedes ver cómo caben en la parcela en el <a href="#simulador">simulador 3D</a>.'],
+ ['juegos',/(taca|ping|pong|juego|entreten|mesa)/,()=>'Juegos y entretención:<br>'+priceList('juegos')],
+ ['comida',/(papas|algod|completo|comida|maquina|hot ?dog|dulce|snack)/,()=>'Máquinas de alimentos:<br>'+priceList('comida')],
+ ['piscinas',/(piscina|agua|pileta|chapotear)/,()=>'Piscinas:<br>'+priceList('piscinas')],
+ ['horario_atencion',/(horario de atencion|atienden|abierto|cuando (puedo )?(llamar|escribir)|dias de atencion|atencion)/,()=>NEG.atencion?`Atendemos: ${esc(NEG.atencion)}. También puedes ${waLink}.`:`Para saber cuándo atiende el equipo, puedes ${waLink}.`],
+ ['horario_franjas',/(franja|turno|a que hora|hora del evento|cuanto dura|duracion|manana o tarde|horarios?)/,()=>`Hay dos franjas por día: <b>Mañana ${SLOTS.manana.h}</b> y <b>Tarde ${SLOTS.tarde.h}</b>.`],
+ ['simulador',/(3d|simulador|distribu|mover|arrastr|disenar|diseno)/,()=>'En el <a href="#simulador">simulador 3D</a> arrastras los juegos por el terreno, los giras y ves si caben. Lo que dejes ahí pasa directo a tu cotización.'],
+ ['reservar',/(reserv|arrend|contrat|como (hago|funciona|se hace)|pasos|quiero (hacer|organizar)|agendar)/,()=>'Para reservar: 1) elige la fecha, 2) arma tu distribución en el <a href="#simulador">simulador 3D</a>, 3) revisa la cotización y 4) paga el abono en <a href="#reservar">Reservar</a>.'],
+ ['contacto',/(humano|persona|whatsapp|contacto|telefono|ejecutiv|llamar|correo|email|mail|hablar con)/,()=>`Te derivo con el equipo: puedes ${waLink}${NEG.correo?` o escribir a ${esc(NEG.correo)}`:''}.`],
+ ['disponibilidad_sin_fecha',/(disponib|libre|queda|ocupad|fecha|dia)/,()=>'Dime la fecha (por ejemplo "25 de octubre" o "25/10") y te digo qué hay disponible.'],
+ ['gracias',/(gracias|genial|perfecto|listo|excelente|buenisimo|ok\b)/,()=>'¡De nada! Si necesitas algo más, aquí estoy.'],
+ ['despedida',/(chao|adios|hasta luego|nos vemos|bye)/,()=>'¡Hasta pronto! Cuando quieras armar tu fiesta, aquí estaré.'],
+ ['saludo',/(hola|buenas|buen dia|buenos dias|hey|holi|saludos)/,()=>'¡Hola! Soy el asistente de Divertí Kids. Puedo ayudarte con precios, disponibilidad por fecha, ubicación y cómo reservar.']
 ];
 const chatEl=$('#chat'),msgs=$('#msgs');
-function say(html,who){const m=document.createElement('div');m.className='m '+who;if(who==='me')m.textContent=html;else m.innerHTML=html;msgs.appendChild(m);msgs.scrollTop=msgs.scrollHeight;
+function say(html,who,intent){const m=document.createElement('div');m.className='m '+who;if(intent)m.dataset.intent=intent;if(who==='me')m.textContent=html;else m.innerHTML=html;msgs.appendChild(m);msgs.scrollTop=msgs.scrollHeight;
   m.querySelectorAll('[data-pick]').forEach(a=>a.onclick=()=>{const d=parseISO(a.dataset.pick);S.date=a.dataset.pick;S.month=new Date(d.getFullYear(),d.getMonth(),1);if(!slotFree(S.date,S.slot))S.slot=Object.keys(SLOTS).find(s=>slotFree(S.date,s))||S.slot;refreshAll();chatEl.hidden=true;$('#chatFab').hidden=false});
   m.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',()=>{chatEl.hidden=true;$('#chatFab').hidden=false}))}
 function ask(t){
-  say(t,'me');const q=t.toLowerCase();const t0=performance.now();
+  say(t,'me');const q=norm(t);
   setTimeout(()=>{
-    let ans=null;
-    if(parseDate(q)&&/(\d)/.test(q)&&!/precio|cu[aá]nto/.test(q))ans=availAnswer(parseDate(q));
-    if(!ans)for(const [re,fn] of FAQ){if(re.test(q)){ans=fn(q);break}}
-    say(ans||`No estoy seguro de haber entendido. Prueba con precios, disponibilidad, ubicación o cómo reservar, o puedes ${waLink}.`,'bot');
+    let ans=null,intent='no_entendido';
+    const dt=parseDate(q);
+    if(dt&&!/precio|cuanto (cuesta|sale|vale)|valor/.test(q)){ans=availAnswer(dt);intent='disponibilidad'}
+    if(!ans)for(const [id,re,fn] of FAQ){if(re.test(q)){const a=fn(q);if(a){ans=a;intent=id;break}}}
+    say(ans||`No estoy seguro de haber entendido. Prueba con precios, disponibilidad, ubicación o cómo reservar, o puedes ${waLink}.`,'bot',intent);
   },350);
 }
 $('#chatForm').addEventListener('submit',e=>{e.preventDefault();const v=$('#chatIn').value.trim();if(!v)return;$('#chatIn').value='';ask(v)});
@@ -360,10 +415,17 @@ $('#clearAll').onclick=()=>{[...S.placed].forEach(p=>scene&&scene.remove(p.mesh)
 document.addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;if(e.key==='r'||e.key==='R')rotateSel(1);if((e.key==='Delete'||e.key==='Backspace')&&S.sel){e.preventDefault();removeUid(S.sel)}});
 
 initScene();
+if(API.online){ // pago real en Flow: se ocultan los campos de tarjeta de prueba
+  ['#cardBlock','.sandbox:not(#onlineNote)'].forEach(q=>{const e=document.querySelector(q);if(e)e.hidden=true});
+  $('#onlineNote').hidden=false;if((window.DK_CONFIG||{}).PAGO_PRUEBAS===false)$('#payNote').textContent='Pagos seguros con Flow.';$('#payGo').textContent='Ir a pagar a Flow';$('#payT').textContent='Pagar abono en línea';
+}
 if(THREE_OK){
   spawn('castillo',-4,1,0);spawn('tacataca',5,5,0);spawn('papas',9,-3,0);spawn('piscinaS',-5,-5,0);spawn('algodon',11,2,0);
   // vista inicial del terreno
   Object.assign(cam,{theta:0.5,phi:0.85,r:34});
 }
 renderTabs();refreshAll();render();
+
+{const q=new URLSearchParams(location.search),f=q.get('folio'),c=q.get('c');
+ if(f&&c){history.replaceState(null,'',location.pathname);showReturn(f,c)}}
 })();

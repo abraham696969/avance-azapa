@@ -4,115 +4,174 @@
 
 | Archivo | Para qué sirve |
 |---|---|
-| `index.html` | Sitio de **clientes** (servicios, fecha, simulador 3D, reserva y pago). |
-| `admin.html` | Panel de **administración**, con su propio login. Es otra página distinta. |
-| `config.js` | Aquí pegas los datos de tu base de datos (paso 3). |
-| `schema.sql` | Crea las tablas, reglas de seguridad y funciones en la base de datos (paso 2). |
+| `index.html` | Sitio de **clientes** (servicios, fecha, simulador 3D, reserva, pago y chatbot). |
+| `admin.html` | Panel de **administración** con su propio login: reservas, fechas bloqueadas y servicios. |
+| `config.js` | Aquí pegas las claves de la base de datos y los datos del negocio para el chatbot. |
+| `schema.sql` | Crea las tablas, reglas de seguridad y funciones de la base de datos (paso 2). |
+| `supabase/functions/` | Tres funciones de servidor para cobrar con Flow (paso 7). |
+| `pruebas/` | Pruebas automáticas y el resultado de la prueba del chatbot. |
 | `shared.js`, `app.js`, `admin.js`, `styles.css` | Código y estilos. No necesitas tocarlos. |
 
-Dirección del sitio de clientes: `https://tu-sitio.com/`
-Dirección del panel admin: `https://tu-sitio.com/admin.html` (solo el equipo; el sitio de clientes tiene un enlace discreto "Administración" en el pie).
+Sitio de clientes: `https://tu-sitio.com/` · Panel admin: `https://tu-sitio.com/admin.html`
 
 ---
 
-## Modo demo (sin base de datos)
+## Modo demo (sin base de datos ni pago real)
 
-Si `config.js` está vacío, todo funciona en **modo demo**: los datos se guardan solo en el navegador de quien lo prueba.
-En `admin.html` entras con **admin@divertikids.cl** y clave **admin1234**. Sirve para probar y mostrar, **no protege nada**.
-
-Para que cliente y admin compartan datos en modo demo, ábrelos desde el mismo lugar (por ejemplo, ya publicados, o con un servidor local). No es para uso real.
+Si `SUPABASE_URL` y `SUPABASE_ANON_KEY` están vacíos en `config.js`, todo funciona en **modo demo**: los datos se guardan solo en el navegador y el pago es simulado. En `admin.html` entras con **admin@divertikids.cl** y clave **admin1234** (solo es un trámite de la demo, no protege nada).
 
 ---
 
 ## Base de datos real con Supabase (gratis para empezar)
 
 ### Paso 1 · Crear el proyecto
-1. Entra a **https://supabase.com** y crea una cuenta (puedes usar Google o GitHub).
-2. Pulsa **New project**. Ponle nombre `diverti-kids`.
-3. En **Database Password** escribe una clave fuerte y **guárdala** en un lugar seguro.
-4. En **Region** elige la más cercana a Chile: **South America (São Paulo)**.
-5. Pulsa **Create new project** y espera 1 o 2 minutos.
+1. Entra a **https://supabase.com**, crea una cuenta y pulsa **New project**. Nombre: `diverti-kids`.
+2. En **Database Password** escribe una clave fuerte y **guárdala**.
+3. En **Region** elige **South America (São Paulo)** y pulsa **Create new project** (1 a 2 minutos).
 
 ### Paso 2 · Crear las tablas
-1. En el menú izquierdo abre **SQL Editor** y pulsa **New query**.
-2. Abre el archivo `schema.sql`, copia **todo** su contenido y pégalo.
-3. Pulsa **Run**. Debe decir "Success. No rows returned".
-4. Para comprobar, abre **Table Editor**: verás `reservas`, `catalogo`, `fechas_bloqueadas` y `admins`. `catalogo` ya trae los 11 servicios.
+1. Menú izquierdo > **SQL Editor** > **New query**.
+2. Copia **todo** el contenido de `schema.sql`, pégalo y pulsa **Run**. Debe decir "Success".
+3. En **Table Editor** verás `reservas`, `catalogo`, `fechas_bloqueadas` y `admins`. El catálogo trae los 11 servicios de ejemplo.
 
-Se puede volver a ejecutar sin borrar tus datos.
+Si ya habías ejecutado una versión anterior, vuelve a ejecutar este archivo: **actualiza sin borrar** tus reservas ni los precios que hayas cambiado.
 
 ### Paso 3 · Conectar el sitio
-1. En Supabase abre **Project Settings** (engranaje) > **API**.
-2. Copia **Project URL** (algo como `https://abcdxyz.supabase.co`).
-3. Copia la clave **anon public** (empieza con `eyJ...`). Esta clave es pública: la seguridad la dan las reglas del paso 2.
-   **Nunca** pegues la clave `service_role`.
-4. Abre `config.js` con el Bloc de notas y pega ambos valores entre las comillas:
+1. **Project Settings** (engranaje) > **API**. Copia **Project URL** y la clave **anon public** (empieza con `eyJ...`). **Nunca** pegues la clave `service_role` en `config.js`.
+2. Abre `config.js` con el Bloc de notas y pégalas:
 
 ```js
 window.DK_CONFIG={
   SUPABASE_URL:"https://abcdxyz.supabase.co",
-  SUPABASE_ANON_KEY:"eyJ...tu clave anon..."
+  SUPABASE_ANON_KEY:"eyJ...tu clave anon...",
+  PAGO_ONLINE:false,   // se activa en el paso 7
+  PAGO_PRUEBAS:true
 };
 ```
 
 ### Paso 4 · Crear el usuario administrador
-1. En Supabase abre **Authentication** > **Users** > **Add user** > **Create new user**.
-2. Escribe el correo y una contraseña. Marca **Auto Confirm User** y pulsa **Create user**.
-3. Vuelve a **SQL Editor**, nueva consulta, pega esto cambiando el correo por el tuyo, y pulsa **Run**:
+1. **Authentication** > **Users** > **Add user** > **Create new user**: correo y contraseña, marca **Auto Confirm User**.
+2. En **SQL Editor** ejecuta (cambia el correo por el tuyo):
 
 ```sql
 insert into public.admins (user_id)
 select id from auth.users where email = 'tu-correo@ejemplo.cl';
 ```
 
-Solo los usuarios que estén en la tabla `admins` pueden entrar al panel. Para agregar a otra persona, repite los pasos 1 a 3 con su correo.
+Solo quienes estén en `admins` entran al panel. Para otra persona, repite con su correo.
 
 ### Paso 5 · Cerrar los registros públicos
-Para que nadie más pueda crear cuentas:
-1. **Authentication** > **Sign In / Providers** (en algunas versiones, **Providers**) > **Email**.
-2. Desactiva **Allow new users to sign up** y guarda.
-
-(Aunque alguien se registrara, no vería reservas: no está en `admins`. Igual conviene cerrarlo.)
+**Authentication** > **Sign In / Providers** > **Email**: desactiva **Allow new users to sign up** y guarda. (El nombre del menú puede variar un poco entre versiones.)
 
 ### Paso 6 · Publicar el sitio
-Elige una opción gratuita y sube **toda la carpeta**:
-- **Netlify:** entra a https://app.netlify.com/drop y arrastra la carpeta. Te da una dirección al instante.
+Sube **toda la carpeta** a una opción gratuita:
+- **Netlify:** https://app.netlify.com/drop y arrastra la carpeta.
 - **Cloudflare Pages:** *Workers & Pages* > *Create* > *Pages* > *Upload assets*.
-- **GitHub Pages:** sube la carpeta a un repositorio y activa Pages en *Settings*.
+- **GitHub Pages:** sube la carpeta a un repositorio y activa Pages.
 
-Después, en Supabase abre **Authentication** > **URL Configuration** y pon tu dirección en **Site URL**.
+Anota la dirección final (por ejemplo `https://divertikids.netlify.app`). En Supabase, **Authentication** > **URL Configuration**, ponla en **Site URL**.
 
-### Paso 7 · Probar
-1. Abre `https://tu-sitio/` desde el celular, agrega un servicio y haz una reserva de prueba (tarjeta ya cargada).
-2. Abre `https://tu-sitio/admin.html`, entra con el usuario del paso 4 y verás la reserva con su distribución.
-3. Cambia su estado a **confirmada**, bloquea una fecha o cambia un precio, y recarga el sitio de clientes para ver el efecto.
+Con esto ya funciona todo, y las reservas nuevas quedan **pendientes** para que el equipo valide el abono a mano. Para cobrar en línea, sigue el paso 7.
 
 ---
 
+## Paso 7 · Cobrar en línea con Flow (modo pruebas primero)
+
+Flow (https://www.flow.cl) procesa tarjetas y otros medios en Chile. El pago **no puede hacerse solo desde el navegador** porque exige una clave secreta, por eso se usan 3 funciones de servidor incluidas en `supabase/functions/`.
+
+**Cómo funciona:** el cliente reserva y su cupo queda guardado **30 minutos** (estado `por_pagar`) > lo llevamos a Flow > Flow avisa a nuestro servidor > el servidor consulta a Flow el estado real del pago y, solo si está pagado y el monto coincide, pasa la reserva a `confirmada`. Si no paga en 30 minutos, el cupo se libera solo. El monto lo calcula el servidor; el navegador nunca lo decide.
+
+### 7.1 · Cuenta de pruebas en Flow
+1. Crea una cuenta en **https://sandbox.flow.cl** (ambiente de pruebas, no cobra dinero).
+2. Obtén tu **API Key** y tu **Secret Key** de pruebas (ver "Credenciales de prueba" en https://developers.flow.cl). Son dos textos largos; la Secret Key **no se comparte con nadie ni va en `config.js`**.
+
+### 7.2 · Publicar las 3 funciones (elige una forma)
+
+**Forma A, desde la web de Supabase (sin instalar nada):**
+1. **Edge Functions** > **Deploy a new function** > **Via Editor**.
+2. Nombre exacto `flow-crear-pago`; pega el contenido de `supabase/functions/flow-crear-pago/index.ts` y **Deploy**.
+3. Repite con `flow-confirmacion` y `flow-retorno`.
+4. En estas dos últimas, desactiva **Verify JWT** / **Enforce JWT verification** (en los ajustes de cada función), porque las llama Flow y el navegador sin sesión. Deja activado en `flow-crear-pago`.
+
+**Forma B, con la terminal** (necesita Node.js; desde la carpeta del sitio):
+```
+npx supabase login
+npx supabase link --project-ref TU_REFERENCIA
+npx supabase functions deploy flow-crear-pago
+npx supabase functions deploy flow-confirmacion --no-verify-jwt
+npx supabase functions deploy flow-retorno --no-verify-jwt
+```
+(La "referencia" es el texto de `https://TU_REFERENCIA.supabase.co`.)
+
+### 7.3 · Guardar las claves como secretos
+En **Edge Functions** > **Secrets** (o con `npx supabase secrets set NOMBRE=valor`) crea:
+
+| Secreto | Valor |
+|---|---|
+| `FLOW_API_KEY` | tu API Key de pruebas de Flow |
+| `FLOW_SECRET_KEY` | tu Secret Key de pruebas de Flow |
+| `SITE_URL` | la dirección de tu sitio **sin** `/` al final, ej. `https://divertikids.netlify.app` |
+
+(`FLOW_API_URL` es opcional: por defecto usa el sandbox `https://sandbox.flow.cl/api`.)
+
+### 7.4 · Activar en el sitio
+En `config.js` cambia `PAGO_ONLINE:false` por `PAGO_ONLINE:true` y vuelve a subir el sitio.
+
+### 7.5 · Probar
+1. En el sitio, agrega un servicio, completa tus datos y pulsa **Pagar abono** > **Ir a pagar a Flow**.
+2. Paga con los datos de prueba que Flow muestra en su ambiente de pruebas.
+3. Al volver verás "¡Pago recibido! Reserva R-xxxx confirmada". En `admin.html` la reserva aparece **confirmada**.
+4. Prueba también cancelar el pago en Flow: la reserva sigue `por_pagar` y se libera a los 30 minutos.
+
+### 7.6 · Pasar a pagos reales
+Pide a Flow habilitar tu cuenta comercial para producción, cambia los secretos `FLOW_API_KEY` y `FLOW_SECRET_KEY` por los reales, agrega el secreto `FLOW_API_URL` = `https://www.flow.cl/api`, y en `config.js` pon `PAGO_PRUEBAS:false` (quita el aviso de "ambiente de pruebas").
+
+> **Importante:** la firma de las llamadas y los avisos de Flow los verifiqué con la documentación de Flow y con un Flow simulado, pero **no pude probar contra el sandbox real** (este entorno no tiene acceso). Haz el paso 7.5 antes de publicar. Los códigos de estado de pago que usa el sistema son los de Flow: 1 pendiente, 2 pagada, 3 rechazada, 4 anulada; confírmalo con tu primer pago de prueba.
+
+---
+
+## Administrar servicios y precios (panel admin)
+En `admin.html`, sección **Agregar servicio** y **Servicios y precios**:
+- **Agregar:** nombre, categoría, tipo en el simulador 3D, descripción, precio, unidades, medidas reales (ancho, largo, alto) y color. Aparece al instante en el catálogo, la cotización y el simulador 3D.
+- **Editar:** botón *Editar* en la lista. Precio y unidades también se cambian directo en la tabla.
+- **Eliminar:** lo oculta del sitio. Las reservas antiguas lo siguen mostrando con su nombre.
+- El arriendo de la parcela no se puede eliminar.
+
+## Chatbot
+Responde **28 temas** (precios, disponibilidad por fecha, ubicación, horarios, pagos, cancelaciones, montaje, etc.) y deriva a una persona por WhatsApp.
+- En `config.js`, bloque `DK_NEGOCIO`, escribe tu WhatsApp real, dirección, horario de atención, política de cancelación, etc. **Lo que dejes vacío, el chatbot lo deriva a una persona** en vez de inventar una respuesta. Cambia el WhatsApp de ejemplo antes de publicar.
+- **Prueba de calidad:** `pruebas/chatbot.test.mjs` lanza 30 consultas y mide el % de aciertos (resultado en `pruebas/resultados-chatbot.md`). Las 30 consultas iniciales las escribí yo, así que **agrega las que de verdad hace tu gente** (están al inicio del archivo) y vuelve a medir.
+
+## Pruebas automáticas (opcional, para quien programe)
+Necesitan Node.js 22 y Playwright (`npm i playwright`):
+```
+node --experimental-strip-types pruebas/flow-mock.test.mjs   # funciones de pago contra un Flow simulado
+node pruebas/chatbot.test.mjs                                # 30 consultas del chatbot
+node pruebas/sitio-demo.test.mjs                             # recorrido completo en modo demo
+node pruebas/sitio-flow.test.mjs                             # recorrido con pago en línea (base simulada)
+```
+
 ## Cómo funciona la seguridad
-- Los clientes **no pueden leer** reservas ni datos de otras personas. Solo ven qué fechas y servicios están ocupados.
-- Al reservar, el **servidor recalcula el precio y revisa la disponibilidad**. Si alguien manipula el navegador, la base lo rechaza.
+- Los clientes **no pueden leer** reservas ni datos de otras personas; solo ven qué está ocupado.
+- Al reservar, el **servidor recalcula el precio y revisa la disponibilidad**; si alguien manipula el navegador, la base lo rechaza.
+- El pago solo lo confirma el servidor tras consultar a Flow; el navegador no puede marcar una reserva como pagada.
 - El panel solo muestra datos a usuarios de la tabla `admins`.
-- Las reservas nuevas quedan **pendientes**. El equipo las pasa a **confirmada** cuando valida el abono.
-
-## Pagos reales (importante)
-El pago de esta versión es **simulado**: no cobra dinero. Para cobrar de verdad se necesita un componente en servidor (Webpay Plus, Flow o Mercado Pago no se pueden llamar directo desde el navegador porque exigen claves secretas). La vía recomendada con Supabase es una **Edge Function** que cree el pago y, al recibir la confirmación del proveedor, cambie la reserva a `confirmada`. Si quieres, ese es el siguiente paso.
-
-Tampoco se envían correos todavía: la "vista previa del correo" es solo ilustrativa.
 
 ## Instalar como app en el celular
-- **iPhone (Safari):** botón Compartir > **Agregar a pantalla de inicio**.
-- **Android (Chrome):** menú ⋮ > **Instalar app** o **Agregar a pantalla de inicio**.
+- **iPhone (Safari):** Compartir > **Agregar a pantalla de inicio**.
+- **Android (Chrome):** menú ⋮ > **Instalar app**.
 
 ## Si algo falla
 | Síntoma | Qué revisar |
 |---|---|
-| "No se pudo conectar con la base de datos" | Que `config.js` tenga la URL y la clave anon completas, sin espacios, y que hayas corrido `schema.sql`. |
-| "Este usuario no tiene permisos de administración" | Falta el paso 4.3 (insertar el correo en `admins`). |
-| "Correo o contraseña incorrectos" | Revisa el usuario en Authentication > Users; que tenga **Auto Confirm** y la clave correcta. |
-| El pago dice que "ya no quedan..." | Otra persona reservó antes; elige otra fecha o franja. |
-| El simulador 3D no aparece | Falta conexión a internet para cargar la librería 3D. El resto del sitio y el pago siguen funcionando. |
+| "No se pudo conectar con la base de datos" | `config.js` con URL y clave anon completas; que hayas corrido `schema.sql`. |
+| "Este usuario no tiene permisos de administración" | Falta el paso 4.2 (insertar el correo en `admins`). |
+| Al pagar dice "No se pudo iniciar el pago" | Revisa los 3 secretos del 7.3 y que `flow-crear-pago` esté publicada. Mira los registros en Edge Functions > *Logs*. |
+| Pagué en Flow pero sigue "por_pagar" | `flow-confirmacion` debe tener **Verify JWT desactivado** y `SITE_URL`/claves correctas; Flow reintenta el aviso. |
+| "El plazo para pagar venció" | Pasaron más de 30 minutos; hay que reservar de nuevo. |
+| Una reserva quedó "pendiente" con una nota en rojo | Flow cobró un monto distinto o el cupo se perdió: revísala en el panel (y reembolsa si corresponde). |
+| El simulador 3D no aparece | Falta internet para cargar la librería 3D; el resto del sitio y el pago siguen funcionando. |
 | Quiero ver errores | En el navegador: F12 > pestaña **Consola**. |
 
 ## Respaldo de los datos
-En Supabase: **Table Editor** > tabla `reservas` > **Export** a CSV. En el plan gratuito, haz esto cada cierto tiempo.
+Supabase: **Table Editor** > `reservas` > **Export** a CSV. En el plan gratuito, hazlo cada cierto tiempo.

@@ -32,13 +32,38 @@ const CAT=[
  {id:'piscinaL',cat:'piscinas',name:'Piscina grande',desc:'Diámetro 5 m, hasta 12 niños.',price:35000,stock:2,w:5,d:5,h:0.8,color:0x1f86e8,shape:'pool'},
  {id:'parcela',cat:'local',name:'Arriendo de la parcela',desc:'Recinto completo de 30 × 20 m con cerco, quincho y árboles.',price:150000,stock:1,w:30,d:20,h:0,color:0x7ccf7a,shape:'land'}
 ];
-const byId=id=>CAT.find(i=>i.id===id);
+CAT.forEach(i=>{i.active=true;if(i.top==null)i.top=0xffffff});
+const ALL=[...CAT];            // todos los servicios (incluye los eliminados, para reservas antiguas)
+const byId=id=>ALL.find(i=>i.id===id);
 const DESIGN=CAT.filter(i=>i.id!=='parcela');
 const TERR={w:30,d:20};
 const OBST=[{x:-11.5,z:-7.5,w:6,d:4,r:0},{x:12.5,z:-6.5,w:1.6,d:1.6,r:0},{x:-12.5,z:6,w:1.6,d:1.6,r:0},{x:9,z:8.3,w:1.6,d:1.6,r:0}];
 
 
-function applyCatalog(cat){CAT.forEach(i=>{const c=cat&&cat[i.id];if(c){if(c.price!=null)i.price=c.price;if(c.stock!=null)i.stock=c.stock}})}
+const hexNum=h=>{const n=parseInt(String(h||'').replace('#',''),16);return isNaN(n)?0x888888:n};
+const numHex=n=>'#'+Number(n).toString(16).padStart(6,'0');
+/* Aplica el catálogo guardado (precios, stock y servicios creados/eliminados desde el panel) */
+function applyCatalog(cat){
+  Object.entries(cat||{}).forEach(([id,c])=>{
+    let it=ALL.find(i=>i.id===id);
+    if(!it){it={id,cat:'juegos',name:id,desc:'',price:0,stock:0,w:2,d:2,h:1.5,color:0x888888,top:0xffffff,shape:'table',active:true};ALL.push(it)}
+    if(c.name!=null)it.name=c.name;
+    if(c.desc!=null)it.desc=c.desc;
+    if(c.cat&&CATS[c.cat])it.cat=c.cat;
+    if(c.price!=null)it.price=c.price;
+    if(c.stock!=null)it.stock=c.stock;
+    if(c.w!=null)it.w=+c.w; if(c.d!=null)it.d=+c.d; if(c.h!=null)it.h=+c.h;
+    if(c.color!=null)it.color=typeof c.color==='number'?c.color:hexNum(c.color);
+    if(c.top!=null)it.top=typeof c.top==='number'?c.top:hexNum(c.top);
+    if(c.shape)it.shape=c.shape;
+    if(c.active!=null)it.active=!!c.active;
+  });
+  CAT.length=0;ALL.filter(i=>i.active!==false||i.id==='parcela').forEach(i=>CAT.push(i));
+  DESIGN.length=0;CAT.filter(i=>i.id!=='parcela').forEach(i=>DESIGN.push(i));
+}
+const SHAPES={castle:'Inflable con torres',slide:'Tobogán inflable',field:'Cancha inflable',table:'Mesa de juego',pingpong:'Mesa de ping pong',machine:'Máquina o carro de comida',pool:'Piscina',box:'Otro objeto (caja)'};
+const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false});
+const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo});
 
 /* ============ Acceso a datos ============ */
 const cfg=window.DK_CONFIG||{};
@@ -75,6 +100,7 @@ function demoSave(s){try{localStorage.setItem(DKEY,JSON.stringify(s))}catch(e){}
 const SLOT_OK=Object.keys(SLOTS);
 const API={
   mode:LIVE?'supabase':'demo',
+  online:LIVE&&!!cfg.PAGO_ONLINE,   // true = el pago se hace en Flow (ver INSTRUCCIONES.md)
   demoUser:DEMO_USER, demoPass:DEMO_PASS,
 
   /* ---------- público ---------- */
@@ -84,12 +110,12 @@ const API={
       const [d,b,k]=await Promise.all([
         c.rpc('disponibilidad'),
         c.from('fechas_bloqueadas').select('fecha,motivo').gte('fecha',iso(today)),
-        c.from('catalogo').select('item_id,precio,stock')
+        c.from('catalogo').select('*')
       ]).then(r=>r.map(ok));
       return {
         res:(d||[]).map(x=>({date:x.fecha,slot:x.franja,items:x.items||{},parcela:!!x.parcela,status:'activa'})),
         blocked:(b||[]).map(x=>({date:x.fecha,why:x.motivo||''})),
-        catalog:Object.fromEntries((k||[]).map(x=>[x.item_id,{price:x.precio,stock:x.stock}]))
+        catalog:Object.fromEntries((k||[]).map(x=>[x.item_id,fromRow(x)]))
       };
     }
     const s=demoLoad();
@@ -99,7 +125,7 @@ const API={
     if(LIVE){
       const r=ok(await sb().rpc('crear_reserva',{
         p_fecha:p.date,p_franja:p.slot,p_nombre:p.client.name,p_email:p.client.email,p_telefono:p.client.phone,
-        p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn}));
+        p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn,p_online:!!p.online}));
       return r;
     }
     const s=demoLoad();
@@ -108,6 +134,23 @@ const API={
     s.res.push({id:folio,date:p.date,slot:p.slot,client:p.client,items:p.items,parcela:p.parcela,status:'confirmada',total,abono,method:p.method,txn:p.txn,layout:p.layout});
     demoSave(s);
     return {folio,total,abono,estado:'confirmada'};
+  },
+
+  /* Pide a la función de servidor la dirección de pago de Flow y devuelve la URL */
+  async startPayment(folio,codigo){
+    const {data,error}=await sb().functions.invoke('flow-crear-pago',{body:{folio,codigo}});
+    if(error){
+      let msg='No se pudo iniciar el pago. Intenta de nuevo.';
+      try{const j=await error.context.json();if(j&&j.error)msg=j.error}catch(e){}
+      throw new Error(msg);
+    }
+    if(!data||!data.url)throw new Error((data&&data.error)||'No se pudo iniciar el pago.');
+    return data.url;
+  },
+  /* Estado de la reserva al volver de Flow (folio + código secreto que viajan en la dirección) */
+  async reservationStatus(folio,codigo){
+    if(!LIVE)return null;
+    return ok(await sb().rpc('estado_reserva',{p_folio:folio,p_codigo:codigo}));
   },
 
   /* ---------- administración ---------- */
@@ -144,12 +187,12 @@ const API={
       const [r,b,k]=await Promise.all([
         c.from('reservas').select('*').order('fecha',{ascending:true}).order('franja',{ascending:true}),
         c.from('fechas_bloqueadas').select('fecha,motivo').order('fecha'),
-        c.from('catalogo').select('item_id,precio,stock')
+        c.from('catalogo').select('*')
       ]).then(x=>x.map(ok));
       return {
-        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[]})),
+        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||''})),
         blocked:b.map(x=>({date:x.fecha,why:x.motivo||''})),
-        catalog:Object.fromEntries(k.map(x=>[x.item_id,{price:x.precio,stock:x.stock}]))
+        catalog:Object.fromEntries(k.map(x=>[x.item_id,fromRow(x)]))
       };
     }
     const s=demoLoad();return {res:s.res,blocked:s.blocked,catalog:s.catalog||{}};
@@ -166,11 +209,21 @@ const API={
     if(LIVE){ok(await sb().from('fechas_bloqueadas').delete().eq('fecha',date));return}
     const s=demoLoad();s.blocked=s.blocked.filter(b=>b.date!==date);demoSave(s);
   },
-  async setCatalog(id,price,stock){
-    if(LIVE){ok(await sb().from('catalogo').update({precio:price,stock}).eq('item_id',id));return}
-    const s=demoLoad();s.catalog=s.catalog||{};s.catalog[id]={price,stock};demoSave(s);
+  /* crea o edita un servicio completo (it = objeto con id, name, desc, cat, price, stock, w, d, h, color, top, shape) */
+  async saveService(it){
+    if(LIVE){ok(await sb().from('catalogo').upsert(rowOf(it),{onConflict:'item_id'}));return}
+    const s=demoLoad();s.catalog=s.catalog||{};
+    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false};
+    demoSave(s);
+  },
+  /* "eliminar" = ocultar del sitio; las reservas antiguas siguen mostrando su servicio */
+  async deleteService(id){
+    if(LIVE){ok(await sb().from('catalogo').update({activo:false}).eq('item_id',id));return}
+    const s=demoLoad();s.catalog=s.catalog||{};const it=byId(id);
+    s.catalog[id]=Object.assign({},s.catalog[id]||{name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape},{active:false});
+    demoSave(s);
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,byId,DESIGN,TERR,OBST,API,applyCatalog};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum};
 })();

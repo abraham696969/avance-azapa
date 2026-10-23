@@ -1,7 +1,7 @@
 -- =====================================================================
 -- Divertí Kids · esquema de base de datos para Supabase (PostgreSQL)
 -- Pégalo completo en Supabase > SQL Editor > New query > Run.
--- Se puede ejecutar más de una vez sin romper nada.
+-- Se puede ejecutar más de una vez (también sobre una versión anterior) sin perder datos.
 -- =====================================================================
 
 -- ---------- Tablas ----------
@@ -11,6 +11,19 @@ create table if not exists public.catalogo (
   precio  integer not null check (precio >= 0),
   stock   integer not null check (stock >= 0)
 );
+-- columnas del catálogo editable desde el panel (si ya existían, no se tocan)
+alter table public.catalogo add column if not exists descripcion text;
+alter table public.catalogo add column if not exists categoria  text    not null default 'juegos'
+  check (categoria in ('juegos','comida','piscinas','local'));
+alter table public.catalogo add column if not exists ancho      numeric(5,2) not null default 2 check (ancho between 0.3 and 30);
+alter table public.catalogo add column if not exists largo      numeric(5,2) not null default 2 check (largo between 0.3 and 30);
+alter table public.catalogo add column if not exists alto       numeric(5,2) not null default 1.5 check (alto between 0 and 8);
+alter table public.catalogo add column if not exists color      text    not null default '#3d7bff' check (color ~ '^#[0-9a-fA-F]{6}$');
+alter table public.catalogo add column if not exists color_tope text    check (color_tope is null or color_tope ~ '^#[0-9a-fA-F]{6}$');
+alter table public.catalogo add column if not exists forma      text    not null default 'box'
+  check (forma in ('castle','slide','field','table','pingpong','machine','pool','box','land'));
+alter table public.catalogo add column if not exists activo     boolean not null default true;
+alter table public.catalogo add column if not exists orden      integer not null default 100;
 
 create table if not exists public.fechas_bloqueadas (
   fecha  date primary key,
@@ -35,10 +48,21 @@ create table if not exists public.reservas (
   abono       integer not null,
   metodo_pago text,
   transaccion text,
-  estado      text not null default 'pendiente'
-              check (estado in ('pendiente','confirmada','finalizada','cancelada')),
+  estado      text not null default 'pendiente',
   creada      timestamptz not null default now()
 );
+-- campos del pago en línea (Flow)
+alter table public.reservas add column if not exists codigo     text not null default substr(replace(gen_random_uuid()::text,'-',''),1,16);
+alter table public.reservas add column if not exists expira     timestamptz;     -- hasta cuándo se guarda el cupo mientras se paga
+alter table public.reservas add column if not exists flow_token text;
+alter table public.reservas add column if not exists flow_orden bigint;
+alter table public.reservas add column if not exists pagada_en  timestamptz;
+alter table public.reservas add column if not exists nota       text;
+
+-- estados: por_pagar (esperando el pago en Flow), pendiente (el equipo debe validar), confirmada, finalizada, cancelada
+alter table public.reservas drop constraint if exists reservas_estado_check;
+alter table public.reservas add  constraint reservas_estado_check
+  check (estado in ('por_pagar','pendiente','confirmada','finalizada','cancelada'));
 create index if not exists reservas_fecha_idx on public.reservas (fecha, franja);
 
 -- Quiénes son administradores (usuarios de Supabase Auth)
@@ -47,24 +71,34 @@ create table if not exists public.admins (
 );
 
 -- ---------- Catálogo inicial ----------
-insert into public.catalogo (item_id, nombre, precio, stock) values
-  ('castillo','Castillo inflable',45000,2),
-  ('tobogan','Tobogán inflable',70000,1),
-  ('cancha','Cancha inflable',60000,1),
-  ('tacataca','Mesa de taca-taca',18000,3),
-  ('pingpong','Mesa de ping pong',15000,2),
-  ('papas','Máquina de papas fritas',40000,2),
-  ('algodon','Algodón de azúcar',30000,2),
-  ('completos','Máquina de completos',35000,2),
-  ('piscinaS','Piscina chica',20000,3),
-  ('piscinaL','Piscina grande',35000,2),
-  ('parcela','Arriendo de la parcela',150000,1)
-on conflict (item_id) do nothing;
+insert into public.catalogo (item_id,nombre,descripcion,categoria,precio,stock,ancho,largo,alto,color,color_tope,forma,activo,orden) values
+  ('castillo','Castillo inflable','Torres y salto libre para los más chicos.','juegos',45000,2,4.5,4.5,3.5,'#ff5fa2',null,'castle',true,10),
+  ('tobogan','Tobogán inflable','Rampa de subida y bajada con plataforma.','juegos',70000,1,4,7,4.5,'#3d7bff',null,'slide',true,20),
+  ('cancha','Cancha inflable','Para fútbol o juegos de equipo.','juegos',60000,1,6,4,2.2,'#2bb673',null,'field',true,30),
+  ('tacataca','Mesa de taca-taca','Taca-taca de madera para 2 a 4 jugadores.','juegos',18000,3,1.5,0.9,0.9,'#8a5a2b',null,'table',true,40),
+  ('pingpong','Mesa de ping pong','Reglamentaria, con paletas y pelotas.','juegos',15000,2,2.7,1.5,0.8,'#1e6bb8',null,'pingpong',true,50),
+  ('papas','Máquina de papas fritas','Papas calientes en el momento.','comida',40000,2,1.2,1.2,1.6,'#ffc21a','#e0402f','machine',true,60),
+  ('algodon','Algodón de azúcar','Con carro y conos.','comida',30000,2,1.1,1.1,1.5,'#f56fa6','#ffffff','machine',true,70),
+  ('completos','Máquina de completos','Completos armados al instante.','comida',35000,2,1.4,1.1,1.6,'#e0402f','#ffc21a','machine',true,80),
+  ('piscinaS','Piscina chica','Diámetro 3 m, para los más pequeños.','piscinas',20000,3,3,3,0.6,'#39a0ff',null,'pool',true,90),
+  ('piscinaL','Piscina grande','Diámetro 5 m, hasta 12 niños.','piscinas',35000,2,5,5,0.8,'#1f86e8',null,'pool',true,100),
+  ('parcela','Arriendo de la parcela','Recinto completo de 30 × 20 m con cerco, quincho y árboles.','local',150000,1,30,20,0,'#7ccf7a',null,'land',true,110)
+on conflict (item_id) do update set
+  descripcion = excluded.descripcion, categoria = excluded.categoria, ancho = excluded.ancho, largo = excluded.largo,
+  alto = excluded.alto, color = excluded.color, color_tope = excluded.color_tope, forma = excluded.forma, orden = excluded.orden
+  where public.catalogo.descripcion is null;   -- solo completa filas de una versión anterior; no pisa lo que editaste
 
 -- ---------- Funciones auxiliares ----------
 create or replace function public.es_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.admins where user_id = auth.uid());
+$$;
+
+-- ¿la reserva ocupa cupo? (las "por_pagar" lo ocupan solo hasta que vence su plazo)
+create or replace function public.reserva_vigente(p_estado text, p_expira timestamptz)
+returns boolean language sql stable as $$
+  select p_estado in ('pendiente','confirmada','finalizada')
+      or (p_estado = 'por_pagar' and p_expira is not null and p_expira > now());
 $$;
 
 -- Disponibilidad pública: solo fecha, franja y qué se arrendó. SIN datos de clientes.
@@ -73,18 +107,21 @@ returns table (fecha date, franja text, items jsonb, parcela boolean)
 language sql stable security definer set search_path = public as $$
   select r.fecha, r.franja, r.items, r.parcela
   from public.reservas r
-  where r.estado <> 'cancelada' and r.fecha >= current_date;
+  where public.reserva_vigente(r.estado, r.expira) and r.fecha >= current_date;
 $$;
 
 -- Crear reserva: el servidor recalcula precios y valida disponibilidad (no confía en el navegador).
+-- p_online = true  -> queda "por_pagar" (30 min de plazo) y se paga en Flow
+-- p_online = false -> queda "pendiente" y el equipo valida el abono a mano
+drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text);
 create or replace function public.crear_reserva(
   p_fecha date, p_franja text, p_nombre text, p_email text, p_telefono text,
   p_invitados integer, p_items jsonb, p_parcela boolean, p_layout jsonb,
-  p_metodo text, p_transaccion text
+  p_metodo text, p_transaccion text, p_online boolean default false
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
-  v_total integer := 0; v_abono integer; v_folio text;
+  v_total integer := 0; v_abono integer; v_folio text; v_codigo text; v_estado text;
   v_key text; v_qty integer; v_cat public.catalogo%rowtype; v_usado integer;
 begin
   if p_franja not in ('manana','tarde') then raise exception 'Franja horaria no válida.'; end if;
@@ -101,8 +138,8 @@ begin
   if exists (select 1 from public.fechas_bloqueadas where fecha = p_fecha) then
     raise exception 'Esa fecha está bloqueada. Elige otra.';
   end if;
-  if exists (select 1 from public.reservas where fecha = p_fecha and franja = p_franja
-             and parcela and estado <> 'cancelada') then
+  if exists (select 1 from public.reservas r where r.fecha = p_fecha and r.franja = p_franja
+             and r.parcela and public.reserva_vigente(r.estado, r.expira)) then
     raise exception 'La parcela ya fue reservada en esa franja. Elige otra fecha o franja.';
   end if;
 
@@ -110,11 +147,11 @@ begin
     select key, (value)::text::integer from jsonb_each(coalesce(p_items,'{}'::jsonb))
   loop
     if v_qty is null or v_qty < 1 or v_key = 'parcela' then raise exception 'Servicios no válidos.'; end if;
-    select * into v_cat from public.catalogo where item_id = v_key;
-    if not found then raise exception 'Servicio desconocido: %', v_key; end if;
+    select * into v_cat from public.catalogo where item_id = v_key and activo;
+    if not found then raise exception 'El servicio "%" ya no está disponible.', v_key; end if;
     select coalesce(sum((r.items ->> v_key)::integer), 0) into v_usado
       from public.reservas r
-      where r.fecha = p_fecha and r.franja = p_franja and r.estado <> 'cancelada';
+      where r.fecha = p_fecha and r.franja = p_franja and public.reserva_vigente(r.estado, r.expira);
     if v_usado + v_qty > v_cat.stock then
       raise exception 'Ya no quedan suficientes "%" para esa fecha y franja.', v_cat.nombre;
     end if;
@@ -127,17 +164,64 @@ begin
   end if;
   if v_total <= 0 then raise exception 'Tu cotización está vacía.'; end if;
 
-  v_abono := round(v_total * 0.30);
-  v_folio := 'R-' || nextval('public.folio_seq');
+  v_abono  := round(v_total * 0.30);
+  v_folio  := 'R-' || nextval('public.folio_seq');
+  v_estado := case when coalesce(p_online,false) then 'por_pagar' else 'pendiente' end;
 
-  -- Queda "pendiente" hasta que el equipo valide el abono (ver INSTRUCCIONES.md sobre pagos reales)
   insert into public.reservas (folio, fecha, franja, nombre, email, telefono, invitados, items, parcela, layout,
-                               total, abono, metodo_pago, transaccion, estado)
+                               total, abono, metodo_pago, transaccion, estado, expira)
   values (v_folio, p_fecha, p_franja, trim(p_nombre), trim(p_email), trim(p_telefono), p_invitados,
           coalesce(p_items,'{}'::jsonb), coalesce(p_parcela,true), coalesce(p_layout,'[]'::jsonb),
-          v_total, v_abono, p_metodo, p_transaccion, 'pendiente');
+          v_total, v_abono, p_metodo, p_transaccion, v_estado,
+          case when v_estado = 'por_pagar' then now() + interval '30 minutes' end)
+  returning codigo into v_codigo;
 
-  return jsonb_build_object('folio', v_folio, 'total', v_total, 'abono', v_abono, 'estado', 'pendiente');
+  return jsonb_build_object('folio', v_folio, 'codigo', v_codigo, 'total', v_total, 'abono', v_abono, 'estado', v_estado);
+end;
+$$;
+
+-- Estado de una reserva para la pantalla de retorno del pago (exige folio + código secreto)
+create or replace function public.estado_reserva(p_folio text, p_codigo text)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce((
+    select jsonb_build_object(
+      'folio', r.folio, 'fecha', r.fecha, 'franja', r.franja, 'total', r.total, 'abono', r.abono,
+      'estado', case when r.estado = 'por_pagar' and (r.expira is null or r.expira <= now()) then 'expirada' else r.estado end)
+    from public.reservas r where r.folio = p_folio and r.codigo = p_codigo), 'null'::jsonb);
+$$;
+
+-- Lo llaman SOLO las funciones de servidor (Edge Functions) cuando Flow informa el resultado de un pago.
+-- p_status de Flow: 1 = pendiente de pago, 2 = pagada, 3 = rechazada, 4 = anulada
+create or replace function public.marcar_pago(p_folio text, p_status integer, p_flow_orden bigint, p_monto integer)
+returns text language plpgsql security definer set search_path = public as $$
+declare r public.reservas%rowtype;
+begin
+  select * into r from public.reservas where folio = p_folio for update;
+  if not found then return 'no_existe'; end if;
+  if r.estado in ('confirmada','finalizada') then return 'ya_confirmada'; end if;
+
+  if p_status = 2 then
+    if p_monto is distinct from r.abono then
+      update public.reservas set estado = 'pendiente', flow_orden = p_flow_orden,
+        nota = 'Flow informó un pago de ' || p_monto || ' y el abono era ' || r.abono || '. Revisar.' where id = r.id;
+      return 'monto_distinto';
+    end if;
+    -- ¿el cupo se perdió mientras tanto? (pago tardío, reserva ya vencida o cancelada)
+    if r.estado = 'cancelada' or (r.estado = 'por_pagar' and r.expira <= now() and exists (
+         select 1 from public.reservas o where o.id <> r.id and o.fecha = r.fecha and o.franja = r.franja
+           and o.parcela and r.parcela and public.reserva_vigente(o.estado, o.expira))) then
+      update public.reservas set estado = 'pendiente', flow_orden = p_flow_orden, pagada_en = now(),
+        nota = 'Pago recibido pero el cupo ya no estaba disponible: contactar al cliente o reembolsar.' where id = r.id;
+      return 'cupo_perdido';
+    end if;
+    update public.reservas set estado = 'confirmada', flow_orden = p_flow_orden, pagada_en = now(),
+      metodo_pago = 'Flow', transaccion = 'FLOW-' || p_flow_orden where id = r.id;
+    return 'confirmada';
+  elsif p_status = 4 then
+    update public.reservas set estado = 'cancelada', nota = 'Pago anulado en Flow.' where id = r.id and estado = 'por_pagar';
+    return 'anulada';
+  end if;
+  return 'sin_cambio';
 end;
 $$;
 
@@ -152,10 +236,12 @@ create policy "admin gestiona reservas" on public.reservas
   for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 drop policy if exists "todos ven el catalogo" on public.catalogo;
-create policy "todos ven el catalogo" on public.catalogo for select to anon, authenticated using (true);
 drop policy if exists "admin edita el catalogo" on public.catalogo;
-create policy "admin edita el catalogo" on public.catalogo
-  for update to authenticated using (public.es_admin()) with check (public.es_admin());
+drop policy if exists "publico ve servicios activos" on public.catalogo;
+create policy "publico ve servicios activos" on public.catalogo for select to anon, authenticated using (activo);
+drop policy if exists "admin gestiona el catalogo" on public.catalogo;
+create policy "admin gestiona el catalogo" on public.catalogo
+  for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 drop policy if exists "todos ven fechas bloqueadas" on public.fechas_bloqueadas;
 create policy "todos ven fechas bloqueadas" on public.fechas_bloqueadas for select to anon, authenticated using (true);
@@ -164,9 +250,15 @@ create policy "admin gestiona bloqueos" on public.fechas_bloqueadas
   for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 -- Permisos de ejecución de las funciones
-revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text) from public;
-grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text) to anon, authenticated;
+revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean) from public;
+grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean) to anon, authenticated;
 revoke all on function public.disponibilidad() from public;
 grant execute on function public.disponibilidad() to anon, authenticated;
 revoke all on function public.es_admin() from public;
 grant execute on function public.es_admin() to anon, authenticated;
+revoke all on function public.estado_reserva(text,text) from public;
+grant execute on function public.estado_reserva(text,text) to anon, authenticated;
+revoke all on function public.reserva_vigente(text,timestamptz) from public;
+grant execute on function public.reserva_vigente(text,timestamptz) to anon, authenticated;
+revoke all on function public.marcar_pago(text,integer,bigint,integer) from public, anon, authenticated;
+grant execute on function public.marcar_pago(text,integer,bigint,integer) to service_role;

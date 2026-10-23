@@ -1,6 +1,6 @@
 (async function(){
 'use strict';
-const {$,$$,CLP,esc,iso,parseISO,fmtDate,today,addDays,toast,SLOTS,CAT,byId,OBST,API,applyCatalog}=DK;
+const {$,$$,CLP,esc,iso,parseISO,fmtDate,today,addDays,toast,SLOTS,CAT,CATS,SHAPES,byId,OBST,API,applyCatalog,numHex}=DK;
 let DB={res:[],blocked:[],catalog:{}};
 const openDet=new Set();
 
@@ -42,9 +42,9 @@ const svgPlan=r=>{
 };
 function render(){
   const R=[...DB.res].sort((a,b)=>a.date.localeCompare(b.date)||a.slot.localeCompare(b.slot));
-  const act=R.filter(r=>r.status!=='cancelada');
+  const act=R.filter(r=>r.status!=='cancelada'&&r.status!=='por_pagar');
   $('#metrics').innerHTML=`<div class="panel"><span class="eyebrow">Reservas activas</span><b>${act.filter(r=>r.status!=='finalizada').length}</b></div>
-   <div class="panel"><span class="eyebrow">Abonos registrados</span><b>${CLP(act.reduce((a,r)=>a+r.abono,0))}</b></div>
+   <div class="panel"><span class="eyebrow">Abonos cobrados</span><b>${CLP(act.filter(r=>r.status==="confirmada"||r.status==="finalizada").reduce((a,r)=>a+r.abono,0))}</b></div>
    <div class="panel"><span class="eyebrow">Pendientes de confirmar</span><b>${R.filter(r=>r.status==='pendiente').length}</b></div>
    <div class="panel"><span class="eyebrow">Fechas bloqueadas</span><b>${DB.blocked.length}</b></div>`;
   const tb=$('#resBody');tb.innerHTML='';
@@ -52,25 +52,50 @@ function render(){
   R.forEach(r=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td><b>${esc(r.id)}</b>${r.example?'<br><span class="note">ejemplo</span>':''}</td><td>${fmtDate(r.date).replace(/ de \d{4}$/,'')}<br><span class="note">${SLOTS[r.slot].n}</span></td><td>${esc(r.client.name)}<br><span class="note">${r.client.guests} invitados</span></td><td class="num">${CLP(r.total)}</td><td class="num">${CLP(r.abono)}</td>
-    <td><select data-st="${esc(r.id)}" aria-label="Estado de ${esc(r.id)}">${['pendiente','confirmada','finalizada','cancelada'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select></td>
+    <td><select data-st="${esc(r.id)}" aria-label="Estado de ${esc(r.id)}">${['por_pagar','pendiente','confirmada','finalizada','cancelada'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select></td>
     <td><button class="btn sm" data-det="${esc(r.id)}">${openDet.has(r.id)?'Ocultar':'Ver distribución'}</button></td>`;
     tb.appendChild(tr);
-    if(openDet.has(r.id)){const d=document.createElement('tr');d.innerHTML=`<td colspan="7"><div class="detail"><div>${svgPlan(r)}</div><div><b>Servicios</b><ul style="margin:6px 0 0;padding-left:18px">${r.parcela?'<li>Arriendo de la parcela</li>':''}${Object.entries(r.items).map(([k,v])=>`<li>${esc(byId(k)?byId(k).name:k)} × ${v}</li>`).join('')}</ul><p class="note" style="margin-top:8px">${esc(r.client.email)} · ${esc(r.client.phone)}</p><p class="note">Pago: ${esc(r.method||'—')} · ${esc(r.txn||'—')}</p></div></div></td>`;tb.appendChild(d)}
+    if(openDet.has(r.id)){const d=document.createElement('tr');d.innerHTML=`<td colspan="7"><div class="detail"><div>${svgPlan(r)}</div><div><b>Servicios</b><ul style="margin:6px 0 0;padding-left:18px">${r.parcela?'<li>Arriendo de la parcela</li>':''}${Object.entries(r.items).map(([k,v])=>`<li>${esc(byId(k)?byId(k).name:k)} × ${v}</li>`).join('')}</ul><p class="note" style="margin-top:8px">${esc(r.client.email)} · ${esc(r.client.phone)}</p><p class="note">Pago: ${esc(r.method||'—')} · ${esc(r.txn||'—')}</p>${r.note?`<p class="note" style="color:var(--bad);font-weight:600">${esc(r.note)}</p>`:''}</div></div></td>`;tb.appendChild(d)}
   });
   $$('[data-st]').forEach(s=>s.onchange=()=>doAct(()=>API.setStatus(s.dataset.st,s.value),'Estado actualizado'));
   $$('[data-det]').forEach(b=>b.onclick=()=>{const k=b.dataset.det;openDet.has(k)?openDet.delete(k):openDet.add(k);render()});
   $('#blockList').innerHTML=DB.blocked.length?DB.blocked.map(b=>`<li><span>${fmtDate(b.date)}<br><span class="note">${esc(b.why)}</span></span><button class="btn sm" data-unb="${b.date}">Quitar</button></li>`).join(''):'<li><span class="muted">No hay fechas bloqueadas</span><span></span></li>';
   $$('[data-unb]').forEach(b=>b.onclick=()=>doAct(()=>API.removeBlock(b.dataset.unb),'Fecha desbloqueada'));
-  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td>${esc(i.name)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td></tr>`).join('');
-  const saveCat=id=>{const p=Math.max(0,Math.round(+document.querySelector(`[data-pr="${id}"]`).value||0)),s=Math.max(0,Math.round(+document.querySelector(`[data-sk="${id}"]`).value||0));doAct(()=>API.setCatalog(id,p,s),'Catálogo actualizado')};
-  $$('[data-pr]').forEach(inp=>inp.onchange=()=>saveCat(inp.dataset.pr));
-  $$('[data-sk]').forEach(inp=>inp.onchange=()=>saveCat(inp.dataset.sk));
+  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td><b>${esc(i.name)}</b><br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
+  const quick=id=>{const it=byId(id);const p=Math.max(0,Math.round(+document.querySelector(`[data-pr="${id}"]`).value||0)),k=Math.max(0,Math.round(+document.querySelector(`[data-sk="${id}"]`).value||0));doAct(()=>API.saveService(Object.assign({},it,{price:p,stock:k})),'Servicio actualizado')};
+  $$('[data-pr]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.pr));
+  $$('[data-sk]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.sk));
+  $$('[data-edit]').forEach(b=>b.onclick=()=>fillForm(byId(b.dataset.edit)));
+  $$('[data-del]').forEach(b=>b.onclick=()=>{const it=byId(b.dataset.del);if(confirm(`¿Eliminar "${it.name}" del sitio?\nLas reservas anteriores no se alteran.`))doAct(()=>API.deleteService(it.id),'Servicio eliminado')});
 }
 $('#blockForm').addEventListener('submit',e=>{e.preventDefault();const d=$('#bDate').value;
   if(!d||parseISO(d)<=today){toast('Elige una fecha futura');return}
   if(DB.blocked.some(b=>b.date===d)){toast('Esa fecha ya está bloqueada');return}
   doAct(()=>API.addBlock(d,$('#bWhy').value.trim()||'Sin motivo'),'Fecha bloqueada')});
 $('#bDate').min=iso(addDays(today,1));
+
+/* ---------- formulario de servicios ---------- */
+$('#sCat').innerHTML=Object.entries(CATS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
+$('#sShape').innerHTML=Object.entries(SHAPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
+function clearForm(){['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
+function fillForm(it){
+  $('#sId').value=it.id;$('#sName').value=it.name;$('#sDesc').value=it.desc||'';$('#sCat').value=it.cat;$('#sShape').value=it.shape==='land'?'castle':it.shape;
+  $('#sPrice').value=it.price;$('#sStock').value=it.stock;$('#sW').value=it.w;$('#sD').value=it.d;$('#sH').value=it.h;$('#sColor').value=numHex(it.color);
+  $('#svcFormT').textContent='Editar: '+it.name;$('#sCancel').hidden=false;$('#sErr').hidden=true;
+  $('#svcForm').scrollIntoView({behavior:'smooth',block:'center'});
+}
+$('#sCancel').onclick=clearForm;
+$('#svcForm').addEventListener('submit',e=>{
+  e.preventDefault();const err=$('#sErr');err.hidden=true;
+  const name=$('#sName').value.trim(),price=Math.round(+$('#sPrice').value),stock=Math.round(+$('#sStock').value),w=+$('#sW').value,d=+$('#sD').value,h=+$('#sH').value;
+  const bad=!name||name.length<3?'Escribe el nombre del servicio (mínimo 3 letras).':!(price>=0)||$('#sPrice').value===''?'Escribe el precio.':!(stock>=0)||$('#sStock').value===''?'Escribe cuántas unidades hay.':!(w>=.3&&w<=30&&d>=.3&&d<=20)?'Las medidas deben ser reales: ancho hasta 30 m y largo hasta 20 m.':!(h>=.2&&h<=8)?'El alto debe estar entre 0,2 y 8 m.':'';
+  if(bad){err.textContent=bad;err.hidden=false;return}
+  let id=$('#sId').value;
+  if(!id){id='s-'+name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)+'-'+Math.random().toString(36).slice(2,5)}
+  const old=byId(id)||{};
+  const it=Object.assign({},old,{id,name,desc:$('#sDesc').value.trim(),cat:$('#sCat').value,shape:old.id==='parcela'?'land':$('#sShape').value,price,stock,w,d,h,color:parseInt($('#sColor').value.slice(1),16),top:old.top!=null?old.top:0xffffff,active:true});
+  doAct(async()=>{await API.saveService(it);clearForm()},old.id?'Servicio actualizado':'Servicio agregado');
+});
 
 /* ---------- arranque ---------- */
 if(API.mode==='demo'){$('#demoHint').hidden=false;$('#dUser').textContent=API.demoUser;$('#dPass').textContent=API.demoPass;$('#lMail').value=API.demoUser}
