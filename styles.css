@@ -212,8 +212,8 @@ html{scroll-behavior:smooth}
 
 /* ===== Adaptación Android / iOS ===== */
 [hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
-body{overflow-x:hidden;overscroll-behavior-y:none;-webkit-font-smoothing:antialiased}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+body{overflow-x:clip;-webkit-font-smoothing:antialiased}
 button,a,.tab,.slot,.day,label{touch-action:manipulation}
 button,.btn,.tab{-webkit-appearance:none;appearance:none}
 input,select,textarea{-webkit-appearance:none;appearance:none;border-radius:10px}

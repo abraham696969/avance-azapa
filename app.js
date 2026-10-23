@@ -208,7 +208,8 @@ function bindStage(cv){
   });
   const end=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2&&mode==='pinch')mode=null;if(mode==='drag'||mode==='orbit'){if(drag){setEmissive(drag.p.mesh,S.sel===drag.p.uid?0x444422:0)}mode=null;drag=null;warnHud(false);cv.classList.remove('dragging');refreshCart()}render()};
   cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
-  cv.addEventListener('wheel',e=>{e.preventDefault();cam.r=Math.min(60,Math.max(14,cam.r*(1+Math.sign(e.deltaY)*.08)));render()},{passive:false});
+  // Solo hace zoom con el pellizco del mousepad o Ctrl + rueda (ambos llegan con ctrlKey). La rueda normal desplaza la página.
+  cv.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();cam.r=Math.min(60,Math.max(14,cam.r*(1+Math.max(-.2,Math.min(.2,e.deltaY*.01)))));render()},{passive:false});
 }
 function warnHud(on){const w=$('#hudWarn');w.hidden=!on;w.textContent='Ahí no cabe: choca o sale del cerco'}
 function camPreset(k){const p={aerea:[0,.2,36],tres:[.5,.8,34],entrada:[0,1.05,26]}[k];Object.assign(cam,{theta:p[0],phi:p[1],r:p[2]});render()}
