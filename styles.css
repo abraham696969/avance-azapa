@@ -327,3 +327,13 @@ header.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5p
 .upl{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .upl-ctl{display:grid;gap:8px;min-width:0;flex:1}
 input[type=file]{width:100%;font-size:.9rem;padding:8px;border:1.5px dashed var(--line);border-radius:10px;background:var(--bg)}
+
+/* ===== Editor del terreno (admin) ===== */
+.te{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+.te-left{display:grid;gap:14px}
+.te-bar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.te-bar select{flex:1;min-width:140px}
+.te-plan{width:100%;height:auto;max-height:70vh;display:block;border:1px solid var(--line);border-radius:12px;background:#d8c9a3;touch-action:none;user-select:none;-webkit-user-select:none}
+.te-plan .it{cursor:grab}.te-plan .it.sel rect,.te-plan .it.sel circle{stroke:#EA278D;stroke-width:.18}
+.te-sel{margin-top:12px;display:grid;gap:12px;padding:14px;background:var(--bg);border-radius:12px}
+@media(max-width:900px){.te{grid-template-columns:1fr}}

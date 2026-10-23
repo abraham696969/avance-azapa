@@ -6,6 +6,7 @@ let data;
 try{data=await API.loadPublic()}
 catch(e){console.error(e);data={res:[],blocked:[],catalog:{}};setTimeout(()=>toast('No se pudo conectar con la base de datos. Revisa config.js.'),600)}
 DK.applyCatalog(data.catalog);
+DK.applyTerrain(data.terrain||DK.DEFAULT_TERRAIN);
 const DB={res:data.res,blocked:data.blocked};
 
 const S={cat:'todos',month:new Date(today.getFullYear(),today.getMonth(),1),date:null,slot:'tarde',parcela:true,placed:[],sel:null,uid:1};
@@ -85,6 +86,8 @@ function renderSlots(){
 let THREE_OK=typeof THREE!=='undefined';
 let scene,camera,renderer,ground,raycaster,mouse,groundPlane;
 const cam={theta:0.4,phi:0.75,r:34};
+let CAM_K=1,CAM_MIN=14,CAM_MAX=60;   // se ajustan al tamaño del terreno
+const zoomTo=r=>{cam.r=Math.min(CAM_MAX,Math.max(CAM_MIN,r))};
 let need=false;
 function render(){need=true;if(render.p)return;render.p=true;requestAnimationFrame(()=>{render.p=false;if(!renderer)return;updCam();renderer.render(scene,camera)})}
 function updCam(){camera.position.set(cam.r*Math.sin(cam.phi)*Math.sin(cam.theta),cam.r*Math.cos(cam.phi),cam.r*Math.sin(cam.phi)*Math.cos(cam.theta));camera.lookAt(0,0,0)}
@@ -154,31 +157,68 @@ function makeLabel(text){
   x.fillStyle='#12203F';x.beginPath();x.roundRect?x.roundRect(4,8,248,48,12):x.rect(4,8,248,48);x.fill();x.fillStyle='#fff';x.font='700 30px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(text,128,33);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));sp.scale.set(4,1,1);return sp;
 }
+/* ---------- terreno: suelo, cerco, elementos fijos, foto aérea y modelo 3D ---------- */
+const GROUND_COLORS={pasto:['#7fcf7d','#76c874'],tierra:['#c9a56b','#c19c62'],cemento:['#b9bcc4','#b1b4bd'],arena:['#e8d6a4','#e2cf9b']};
+function groundCanvas(){
+  const K=24,tc=document.createElement('canvas');tc.width=Math.round(TERR.w*K);tc.height=Math.round(TERR.d*K);const t=tc.getContext('2d');
+  const [c1,c2]=GROUND_COLORS[TERR.ground]||GROUND_COLORS.pasto;
+  for(let i=0;i<Math.ceil(TERR.w);i++)for(let j=0;j<Math.ceil(TERR.d);j++){t.fillStyle=(i+j)%2?c1:c2;t.fillRect(i*K,j*K,K,K)}
+  t.strokeStyle='rgba(255,255,255,.18)';t.lineWidth=1;
+  for(let i=0;i<=TERR.w;i++){t.beginPath();t.moveTo(i*K,0);t.lineTo(i*K,tc.height);t.stroke()}
+  for(let j=0;j<=TERR.d;j++){t.beginPath();t.moveTo(0,j*K);t.lineTo(tc.width,j*K);t.stroke()}
+  return tc;
+}
+const ELEM={ // tipo -> [alto de las paredes, color paredes, color techo]
+  quincho:[2.4,0xe8d6b0,0xb5452f],casa:[2.8,0xf0e6d2,0x8a4b3a],bano:[2.4,0xdfe8ef,0x5b7080]};
+function elementMesh(o){
+  const g=new THREE.Group(),w=o.w,d=o.d;let top=1.2;
+  if(o.t==='arbol'){const k=Math.max(w,d)/1.6;g.add(cyl(.22*k,.28*k,1.6*k,0x7a5230,0,0,0,10));const cr=new THREE.Mesh(new THREE.SphereGeometry(1.2*k,14,10),mat(0x2f8f4e));cr.position.y=2.6*k;cr.castShadow=true;g.add(cr);top=3.8*k}
+  else if(ELEM[o.t]){const [h,wc,rc]=ELEM[o.t];g.add(box(w,h,d,wc));g.add(box(w+.6,.4,d+.6,rc,0,h,0));top=h+.4}
+  else if(o.t==='piscina'){g.add(box(w,.5,d,0xeeeeee));g.add(box(Math.max(.1,w-.4),.05,Math.max(.1,d-.4),0x4fb3ff,0,.48,0));top=.6}
+  else{g.add(box(w,1.2,d,0x9a9a9a))}
+  g.position.set(o.x,0,o.z);g.rotation.y=-o.r;
+  if(o.t!=='arbol'&&o.name){const l=makeLabel(o.name);l.position.set(o.x,top+1.4,o.z);g.userData.label=l}
+  return g;
+}
+function buildTerrain(){
+  const proc=new THREE.Group();   // todo lo "dibujado por código"; se oculta si hay un modelo 3D real del terreno
+  const gm=new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(groundCanvas())});
+  ground=new THREE.Mesh(new THREE.PlaneGeometry(TERR.w,TERR.d),gm);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;proc.add(ground);
+  const out=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(90,TERR.w*3),Math.max(70,TERR.d*3.5)),new THREE.MeshLambertMaterial({color:0xd8c9a3}));out.rotation.x=-Math.PI/2;out.position.y=-.02;proc.add(out);
+  if(TERR.photo){   // foto aérea: la parte de arriba de la foto es el fondo del terreno y la de abajo es la entrada
+    const ld=new THREE.TextureLoader();if(ld.setCrossOrigin)ld.setCrossOrigin('anonymous');
+    ld.load(TERR.photo,tex=>{if(THREE.sRGBEncoding)tex.encoding=THREE.sRGBEncoding;gm.map=tex;gm.needsUpdate=true;render()},undefined,()=>console.warn('No se pudo cargar la foto aérea del terreno'));
+  }
+  if(TERR.fence){   // cerco con entrada al frente (4 m de portón)
+    const fc=0xffffff,W=TERR.w,D=TERR.d,half=Math.max(.5,W/2-2);
+    proc.add(box(W,.9,.12,fc,0,0,-D/2));proc.add(box(.12,.9,D,fc,-W/2,0,0));proc.add(box(.12,.9,D,fc,W/2,0,0));
+    proc.add(box(half,.9,.12,fc,-(W/2-half/2),0,D/2));proc.add(box(half,.9,.12,fc,(W/2-half/2),0,D/2));
+    const lb=makeLabel('ENTRADA');lb.position.set(0,1.6,D/2+.6);proc.add(lb);
+  }
+  OBST.forEach(o=>{const m=elementMesh(o);proc.add(m);if(m.userData.label)proc.add(m.userData.label)});
+  scene.add(proc);
+  if(TERR.model){   // modelo 3D real del terreno (escaneo): reemplaza al terreno dibujado por código
+    loadModel(TERR.model).then(src=>{
+      const m=src.clone(true);m.traverse(o=>{if(o.isMesh){o.receiveShadow=true}});m.updateMatrixWorld(true);
+      const b=new THREE.Box3().setFromObject(m),f=DK.fitGLB([b.min.x,b.min.y,b.min.z],[b.max.x,b.max.y,b.max.z],TERR.modelRot||0,TERR.w,TERR.d);
+      if(!f)return;const holder=new THREE.Group();holder.add(m);holder.rotation.y=(TERR.modelRot||0)*Math.PI/180;holder.scale.setScalar(f.scale);holder.position.set(f.pos[0],f.pos[1],f.pos[2]);
+      scene.add(holder);proc.visible=false;render();
+    }).catch(e=>console.warn('No se pudo cargar el modelo 3D del terreno',e));
+  }
+}
 function initScene(){
   const stage=$('#stage'),cv=$('#cv');
   if(!THREE_OK){stage.innerHTML='<p style="padding:24px">No se pudo cargar el motor 3D. Revisa tu conexión y recarga la página.</p>';return}
+  // la cámara y los límites de zoom se ajustan al tamaño del terreno
+  CAM_K=Math.max(.5,Math.max(TERR.w*1.1,TERR.d*1.7)/34);CAM_MIN=14*CAM_K;CAM_MAX=60*CAM_K;
   renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;
   scene=new THREE.Scene();scene.background=new THREE.Color(0xcfe8ff);
-  camera=new THREE.PerspectiveCamera(45,1,.1,200);
+  camera=new THREE.PerspectiveCamera(45,1,.1,200*CAM_K);
   scene.add(new THREE.HemisphereLight(0xffffff,0x88aa88,.85));
-  const sun=new THREE.DirectionalLight(0xffffff,.65);sun.position.set(-12,24,10);sun.castShadow=true;
-  Object.assign(sun.shadow.camera,{left:-20,right:20,top:16,bottom:-16,near:1,far:70});sun.shadow.mapSize.set(1024,1024);scene.add(sun);
-  // suelo con cuadrícula de 1 m
-  const tc=document.createElement('canvas');tc.width=TERR.w*24;tc.height=TERR.d*24;const t=tc.getContext('2d');
-  for(let i=0;i<TERR.w;i++)for(let j=0;j<TERR.d;j++){t.fillStyle=(i+j)%2?'#7fcf7d':'#76c874';t.fillRect(i*24,j*24,24,24)}
-  t.strokeStyle='rgba(255,255,255,.18)';t.lineWidth=1;for(let i=0;i<=TERR.w;i++){t.beginPath();t.moveTo(i*24,0);t.lineTo(i*24,tc.height);t.stroke()}for(let j=0;j<=TERR.d;j++){t.beginPath();t.moveTo(0,j*24);t.lineTo(tc.width,j*24);t.stroke()}
-  ground=new THREE.Mesh(new THREE.PlaneGeometry(TERR.w,TERR.d),new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(tc)}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
-  const out=new THREE.Mesh(new THREE.PlaneGeometry(90,70),new THREE.MeshLambertMaterial({color:0xd8c9a3}));out.rotation.x=-Math.PI/2;out.position.y=-.02;scene.add(out);
-  // cerco con entrada al frente
-  const fc=0xffffff;
-  scene.add(box(TERR.w,.9,.12,fc,0,0,-TERR.d/2));scene.add(box(.12,.9,TERR.d,fc,-TERR.w/2,0,0));scene.add(box(.12,.9,TERR.d,fc,TERR.w/2,0,0));
-  scene.add(box(TERR.w/2-2,.9,.12,fc,-(TERR.w/4+1),0,TERR.d/2));scene.add(box(TERR.w/2-2,.9,.12,fc,(TERR.w/4+1),0,TERR.d/2));
-  const lb=makeLabel('ENTRADA');lb.position.set(0,1.6,TERR.d/2+.6);scene.add(lb);
-  // obstáculos fijos: quincho y árboles
-  const q=OBST[0];const qg=new THREE.Group();qg.add(box(q.w,2.4,q.d,0xe8d6b0));qg.add(box(q.w+.6,.4,q.d+.6,0xb5452f,0,2.4,0));qg.position.set(q.x,0,q.z);scene.add(qg);
-  const ql=makeLabel('QUINCHO');ql.position.set(q.x,4,q.z);scene.add(ql);
-  OBST.slice(1).forEach(o=>{const tg=new THREE.Group();tg.add(cyl(.22,.28,1.6,0x7a5230,0,0,0,10));const cr=new THREE.Mesh(new THREE.SphereGeometry(1.2,14,10),mat(0x2f8f4e));cr.position.y=2.6;cr.castShadow=true;tg.add(cr);tg.position.set(o.x,0,o.z);scene.add(tg)});
+  const sun=new THREE.DirectionalLight(0xffffff,.65);sun.position.set(-12*CAM_K,24*CAM_K,10*CAM_K);sun.castShadow=true;
+  Object.assign(sun.shadow.camera,{left:-TERR.w/2-5,right:TERR.w/2+5,top:TERR.d/2+6,bottom:-TERR.d/2-6,near:1,far:70*CAM_K});sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+  buildTerrain();
   raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
   bindStage(cv);
   new ResizeObserver(()=>{const r=stage.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();render()}).observe(stage);
@@ -190,7 +230,7 @@ function collides(x,z,it,r,skip){const A=corners(x,z,it.w,it.d,r);
   for(const o of OBST)if(sat(A,corners(o.x,o.z,o.w,o.d,o.r)))return true;
   for(const p of S.placed){if(p.uid===skip)continue;const q=byId(p.id);if(sat(A,corners(p.x,p.z,q.w,q.d,p.rot)))return true}return false}
 function validAt(x,z,it,r,skip){return boundsOK(x,z,it.w,it.d,r)&&!collides(x,z,it,r,skip)}
-function findSpot(it){for(let z=-8;z<=8;z+=1){for(let x=-13;x<=13;x+=1){if(validAt(x,z,it,0,-1))return [x,z]}}return null}
+function findSpot(it){const zm=Math.max(0,TERR.d/2-2),xm=Math.max(0,TERR.w/2-2);for(let z=-zm;z<=zm;z+=1){for(let x=-xm;x<=xm;x+=1){if(validAt(x,z,it,0,-1))return [x,z]}}return null}
 function spawn(id,x,z,rot){
   const it=byId(id),g=THREE_OK?build(it):{position:{set(){}},rotation:{},userData:{}};g.position.set(x,0,z);g.rotation.y=-rot;
   const uid=S.uid++;g.userData.uid=uid;scene&&scene.add(g);
@@ -221,7 +261,7 @@ function bindStage(cv){
   });
   cv.addEventListener('pointermove',e=>{
     if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(mode==='pinch'&&ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);cam.r=Math.min(60,Math.max(14,cam.r*pinch/d));pinch=d;render();return}
+    if(mode==='pinch'&&ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);zoomTo(cam.r*pinch/d);pinch=d;render();return}
     if(mode==='orbit'){cam.theta-=(e.clientX-last.x)*.006;cam.phi=Math.min(1.35,Math.max(.12,cam.phi-(e.clientY-last.y)*.006));last={x:e.clientX,y:e.clientY};render()}
     else if(mode==='drag'&&drag){const gp=groundPt(e);if(!gp)return;const it=byId(drag.p.id);let nx=gp.x+drag.ox,nz=gp.z+drag.oz;
       if(validAt(nx,nz,it,drag.p.rot,drag.p.uid)){drag.p.x=nx;drag.p.z=nz;drag.p.mesh.position.set(nx,0,nz);setEmissive(drag.p.mesh,0x444422);warnHud(false)}
@@ -233,10 +273,10 @@ function bindStage(cv){
   const end=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2&&mode==='pinch')mode=null;if(mode==='drag'||mode==='orbit'){if(drag){setEmissive(drag.p.mesh,S.sel===drag.p.uid?0x444422:0)}mode=null;drag=null;warnHud(false);cv.classList.remove('dragging');refreshCart()}render()};
   cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
   // Solo hace zoom con el pellizco del mousepad o Ctrl + rueda (ambos llegan con ctrlKey). La rueda normal desplaza la página.
-  cv.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();cam.r=Math.min(60,Math.max(14,cam.r*(1+Math.max(-.2,Math.min(.2,e.deltaY*.01)))));render()},{passive:false});
+  cv.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();zoomTo(cam.r*(1+Math.max(-.2,Math.min(.2,e.deltaY*.01))));render()},{passive:false});
 }
 function warnHud(on){const w=$('#hudWarn');w.hidden=!on;w.textContent='Ahí no cabe: choca o sale del cerco'}
-function camPreset(k){const p={aerea:[0,.2,36],tres:[.5,.8,34],entrada:[0,1.05,26]}[k];Object.assign(cam,{theta:p[0],phi:p[1],r:p[2]});render()}
+function camPreset(k){const p={aerea:[0,.2,36],tres:[.5,.8,34],entrada:[0,1.05,26]}[k];Object.assign(cam,{theta:p[0],phi:p[1],r:p[2]*CAM_K});render()}
 function renderPalette(){
   const p=$('#pal');p.innerHTML='';
   DESIGN.forEach(it=>{
@@ -433,7 +473,7 @@ function refreshAll(){
 $('#prevM').onclick=()=>{S.month=new Date(S.month.getFullYear(),S.month.getMonth()-1,1);renderCal()};
 $('#nextM').onclick=()=>{S.month=new Date(S.month.getFullYear(),S.month.getMonth()+1,1);renderCal()};
 $$('[data-cam]').forEach(b=>b.onclick=()=>camPreset(b.dataset.cam));
-$('#zin').onclick=()=>{cam.r=Math.max(14,cam.r*.85);render()};$('#zout').onclick=()=>{cam.r=Math.min(60,cam.r*1.18);render()};
+$('#zin').onclick=()=>{zoomTo(cam.r*.85);render()};$('#zout').onclick=()=>{zoomTo(cam.r*1.18);render()};
 $('#rotL').onclick=()=>rotateSel(1);$('#rotR').onclick=()=>rotateSel(-1);
 $('#delSel').onclick=()=>S.sel&&removeUid(S.sel);
 $('#clearAll').onclick=()=>{[...S.placed].forEach(p=>scene&&scene.remove(p.mesh));S.placed=[];select(null);refreshAll()};
@@ -445,9 +485,9 @@ if(API.online){ // pago real en Flow: se ocultan los campos de tarjeta de prueba
   $('#onlineNote').hidden=false;if((window.DK_CONFIG||{}).PAGO_PRUEBAS===false)$('#payNote').textContent='Pagos seguros con Flow.';$('#payGo').textContent='Ir a pagar a Flow';$('#payT').textContent='Pagar abono en línea';
 }
 if(THREE_OK){
-  spawn('castillo',-4,1,0);spawn('tacataca',5,5,0);spawn('papas',9,-3,0);spawn('piscinaS',-5,-5,0);spawn('algodon',11,2,0);
+  ['castillo','tacataca','papas','piscinaS','algodon'].forEach(id=>{const it=byId(id);if(!it)return;const sp=findSpot(it);if(sp)spawn(id,sp[0],sp[1],0)});
   // vista inicial del terreno
-  Object.assign(cam,{theta:0.5,phi:0.85,r:34});
+  Object.assign(cam,{theta:0.5,phi:0.85,r:34*CAM_K});
 }
 renderTabs();refreshAll();render();
 

@@ -155,6 +155,24 @@ El simulador no puede "adivinar" cómo es tu castillo o tu tobogán: necesita un
 
 Consejos: el archivo debe ser `.glb` (no `.obj`, `.fbx` ni `.gltf` suelto); ideal menos de **10 MB** (máximo permitido 30 MB) porque en el celular carga por internet móvil. Si pesa mucho, se puede reducir gratis en la página gltf.report. Si tienes Blender: *File > Export > glTF 2.0 > formato "glb"*.
 
+## El terreno (parcela) en el simulador
+En el panel de administración, sección **Terreno**, puedes dejar el simulador igual a tu parcela real. Se guarda en la base (tabla `terreno`) y lo ven todos los clientes. **Si ya tenías el proyecto armado, vuelve a pegar `schema.sql` completo en el SQL Editor de Supabase** (es seguro repetirlo): crea la tabla `terreno`.
+
+**Qué puedes configurar**
+- **Medidas:** ancho y largo en metros (de 8 a 80 y de 6 a 60). El precio de la parcela y las medidas que ve el cliente se actualizan solos.
+- **Suelo:** pasto, tierra, cemento o arena. **Cerco:** con o sin.
+- **Elementos fijos** (quincho, casa o bodega, baños, árboles, piscina fija, otros): se agregan con el botón, se **arrastran en el plano** hasta su lugar y se ajustan con medidas y giro. Los juegos no se pueden poner encima de ellos.
+- **Entrada:** siempre es la parte de abajo del plano.
+
+**Atajo para Divertí Kids:** el botón **Cargar mi parcela (según foto satelital)** deja el plano dibujado desde tu foto satelital (48 × 44 m aprox., tierra, cerco, mini canchas, quincho, casa y cocina, baños, piscina, zona de helados y el acceso de vehículos donde no van juegos). Las medidas son aproximadas: ajusta cada elemento arrastrándolo o con sus medidas y pulsa **Guardar terreno**. Los juegos suelen ir en el pasto sintético, que queda libre.
+
+**Con las fotos o el video que tienes de la parcela (de menor a mayor esfuerzo)**
+1. **Medir y dibujar:** mide con huincha o con un mapa (Google Maps → clic derecho → *Medir distancia*) el ancho y largo, y la posición de quincho, baños y árboles. Es lo más rápido y suele bastar.
+2. **Foto aérea:** una foto tomada desde arriba (dron, o captura de satélite de Google Maps) que se estira sobre el suelo. Recórtala justo en los bordes del terreno, con **la parte de arriba de la foto = el fondo de la parcela y la parte de abajo = la entrada**. Si queda al revés, gírala antes de subirla. Es la forma más fiel sin 3D.
+3. **Escaneo 3D (.glb):** con el video de la parcela, una app como Polycam, Luma AI o Kiri Engine arma un modelo que se exporta como `.glb` (menos de 30 MB, ideal menos de 10). Al subirlo reemplaza al terreno dibujado y se ajusta solo a las medidas que pusiste; el campo de giro sirve si queda de lado. Si no carga, el sitio sigue mostrando el terreno dibujado.
+
+**Importante:** en modo demo (sin base de datos) la foto aérea sí se guarda, pero el archivo 3D del terreno solo se puede subir con la base conectada.
+
 ## Chatbot
 Responde **28 temas** (precios, disponibilidad por fecha, ubicación, horarios, pagos, cancelaciones, montaje, etc.) y deriva a una persona por WhatsApp.
 - En `config.js`, bloque `DK_NEGOCIO`, escribe tu WhatsApp real, dirección, horario de atención, política de cancelación, etc. **Lo que dejes vacío, el chatbot lo deriva a una persona** en vez de inventar una respuesta. Cambia el WhatsApp de ejemplo antes de publicar.
@@ -168,6 +186,9 @@ node pruebas/chatbot.test.mjs                                # 30 consultas del 
 node pruebas/ajuste-modelo.test.mjs                          # cómo se ajusta un modelo 3D real al ancho y largo
 node pruebas/sitio-demo.test.mjs                             # recorrido completo en modo demo
 node pruebas/sitio-flow.test.mjs                             # recorrido con pago en línea (base simulada)
+node pruebas/terreno.test.mjs                                # editor del terreno, guardado y uso en el sitio
+node pruebas/parcela-diverti.test.mjs                        # botón "Cargar mi parcela"
+node pruebas/terreno-3d.test.mjs                             # qué se dibuja en el 3D según el terreno (con 3D simulado)
 ```
 
 ## Cómo funciona la seguridad

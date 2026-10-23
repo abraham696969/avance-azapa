@@ -107,6 +107,65 @@
           </form>
         </div>
       </div>
+      <div class="panel" id="terrenoPanel" style="margin-top:20px">
+        <h3>Terreno de la parcela (simulador 3D)</h3>
+        <p class="note" style="margin:4px 0 12px">Aquí dejas el terreno como es en la realidad: medidas, suelo, dónde están el quincho, los árboles, los baños, etc. Arrastra los elementos en el plano. Los clientes no podrán poner juegos encima de ellos.</p>
+        <div class="te">
+          <div class="te-left">
+            <div class="two">
+              <div class="field"><label for="tW">Ancho del terreno (m)</label><input id="tW" type="number" min="8" max="80" step="0.1" inputmode="decimal"></div>
+              <div class="field"><label for="tD">Largo del terreno (m)</label><input id="tD" type="number" min="6" max="60" step="0.1" inputmode="decimal"></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="tGround">Suelo</label><select id="tGround"></select></div>
+              <div class="field"><label for="tFence">Cerco</label><select id="tFence"><option value="1">Con cerco y portón al frente</option><option value="0">Sin cerco</option></select></div>
+            </div>
+            <div class="field">
+              <label for="tPhoto">Foto aérea del terreno (opcional)</label>
+              <input id="tPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+              <button class="btn sm ghost" type="button" id="tPhotoDel" hidden style="margin-top:6px">Quitar foto aérea</button>
+              <span class="note">Una captura de Google Maps o una foto de dron tomada desde arriba. <b>Recórtala justo a los bordes del terreno</b>: la parte de arriba de la foto es el fondo y la de abajo es la entrada.</span>
+            </div>
+            <div class="field">
+              <label for="tModel">Modelo 3D del terreno (opcional, .glb)</label>
+              <input id="tModel" type="file" accept=".glb,model/gltf-binary">
+              <div class="two" style="margin-top:8px">
+                <div class="field"><label for="tModelRot">Girar el modelo</label><select id="tModelRot"><option value="0">No girar</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn sm ghost" type="button" id="tModelDel" hidden>Quitar modelo</button></div>
+              </div>
+              <span class="note" id="tModelNote">Un escaneo 3D de la parcela (hecho con el celular) reemplaza el terreno dibujado. Se ajusta al ancho y largo de arriba. Los elementos del plano siguen bloqueando el espacio.</span>
+            </div>
+            <p class="note" id="tErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="button" id="tSave">Guardar terreno</button><button class="btn ghost" type="button" id="tReset">Volver al terreno de ejemplo</button><button class="btn ghost" type="button" id="tPreset">Cargar mi parcela (según foto satelital)</button></div>
+          </div>
+          <div class="te-right">
+            <div class="te-bar">
+              <select id="eType" aria-label="Tipo de elemento"></select>
+              <button class="btn sm" type="button" id="eAdd">Agregar al plano</button>
+            </div>
+            <svg id="tePlan" class="te-plan" role="img" aria-label="Plano del terreno: arrastra los elementos para moverlos"></svg>
+            <p class="note">Arriba del plano es el fondo del terreno y abajo la entrada. Cada cuadrado es 1 m.</p>
+            <div class="te-sel" id="eForm" hidden>
+              <div class="two">
+                <div class="field"><label for="eName">Nombre</label><input id="eName" maxlength="30"></div>
+                <div class="field"><label for="eT">Tipo</label><select id="eT"></select></div>
+              </div>
+              <div class="two">
+                <div class="field"><label for="eW">Ancho (m)</label><input id="eW" type="number" min="0.3" max="40" step="0.1" inputmode="decimal"></div>
+                <div class="field"><label for="eD">Largo (m)</label><input id="eD" type="number" min="0.3" max="40" step="0.1" inputmode="decimal"></div>
+              </div>
+              <div class="two">
+                <div class="field"><label for="eRot">Giro (grados)</label><input id="eRot" type="number" min="-360" max="360" step="5" inputmode="numeric"></div>
+                <div class="two" style="gap:8px">
+                  <div class="field"><label for="eX">X (m)</label><input id="eX" type="number" step="0.1" inputmode="decimal"></div>
+                  <div class="field"><label for="eZ">Z (m)</label><input id="eZ" type="number" step="0.1" inputmode="decimal"></div>
+                </div>
+              </div>
+              <button class="btn sm" type="button" id="eDel">Eliminar este elemento</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="panel" style="margin-top:20px">
         <h3>Servicios y precios</h3>
         <p class="note" style="margin:4px 0 8px">Los cambios de precio y stock se guardan al salir del campo. "Eliminar" oculta el servicio del sitio; las reservas antiguas lo siguen mostrando.</p>

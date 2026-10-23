@@ -293,3 +293,31 @@ create policy "dk admin cambia archivos" on storage.objects for update to authen
 drop policy if exists "dk admin borra archivos" on storage.objects;
 create policy "dk admin borra archivos" on storage.objects for delete to authenticated
   using (bucket_id in ('servicios','modelos') and public.es_admin());
+
+-- ---------- Terreno (la parcela del simulador 3D) ----------
+create table if not exists public.terreno (
+  id         integer primary key default 1 check (id = 1),          -- una sola fila
+  ancho      numeric not null default 30 check (ancho between 8 and 80),
+  largo      numeric not null default 20 check (largo between 6 and 60),
+  suelo      text    not null default 'pasto' check (suelo in ('pasto','tierra','cemento','arena')),
+  cerco      boolean not null default true,
+  foto       text,                                                    -- foto aérea (dirección pública)
+  modelo3d   text,                                                    -- modelo .glb del terreno (escaneo)
+  modelo_rot integer not null default 0 check (modelo_rot in (0,90,180,270)),
+  elementos  jsonb   not null default '[]'::jsonb
+             check (jsonb_typeof(elementos) = 'array' and jsonb_array_length(elementos) <= 60),
+  actualizado timestamptz not null default now()
+);
+insert into public.terreno (id, elementos) values (1, '[
+  {"id":"q1","t":"quincho","name":"Quincho","x":-11.5,"z":-7.5,"w":6,"d":4,"rot":0},
+  {"id":"a1","t":"arbol","name":"Árbol","x":12.5,"z":-6.5,"w":1.6,"d":1.6,"rot":0},
+  {"id":"a2","t":"arbol","name":"Árbol","x":-12.5,"z":6,"w":1.6,"d":1.6,"rot":0},
+  {"id":"a3","t":"arbol","name":"Árbol","x":9,"z":8.3,"w":1.6,"d":1.6,"rot":0}]'::jsonb)
+on conflict (id) do nothing;
+
+alter table public.terreno enable row level security;
+drop policy if exists "todos ven el terreno" on public.terreno;
+create policy "todos ven el terreno" on public.terreno for select to anon, authenticated using (true);
+drop policy if exists "admin gestiona el terreno" on public.terreno;
+create policy "admin gestiona el terreno" on public.terreno
+  for all to authenticated using (public.es_admin()) with check (public.es_admin());

@@ -12,16 +12,16 @@ const SEED=[['castillo','Castillo inflable','juegos',45000,2,4.5,4.5,3.5,'#ff5fa
  .map(r=>({item_id:r[0],nombre:r[1],descripcion:'',categoria:r[2],precio:r[3],stock:r[4],ancho:r[5],largo:r[6],alto:r[7],color:r[8],color_tope:null,forma:r[9],activo:true,orden:1}));
 const load=()=>{try{return JSON.parse(localStorage.__F)}catch(e){return {cat:SEED,res:[],blocked:[],calls:[],status:null,session:null}}};
 const save=F=>{localStorage.__F=JSON.stringify(F)};
-const mk=t=>{const o={t,a:'select',f:[],p:null};const b={select:()=>b,order:()=>b,gte:(c,v)=>{o.f.push(['gte',c,v]);return b},eq:(c,v)=>{o.f.push(['eq',c,v]);return b},
+const mk=t=>{const o={t,a:'select',f:[],p:null};const b={maybeSingle:()=>{o.one=true;return b},select:()=>b,order:()=>b,gte:(c,v)=>{o.f.push(['gte',c,v]);return b},eq:(c,v)=>{o.f.push(['eq',c,v]);return b},
  upsert:p=>{o.a='upsert';o.p=p;return b},update:p=>{o.a='update';o.p=p;return b},insert:p=>{o.a='insert';o.p=p;return b},delete:()=>{o.a='delete';return b},
  then:(ok,ko)=>Promise.resolve(run(o)).then(ok,ko)};return b};
-function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked'}[o.t];
+function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha',terreno:'id'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked',terreno:'terr'}[o.t];F.terr=F.terr||[];
  const match=r=>o.f.every(([k,c,v])=>k==='eq'?r[c]===v:true);
  if(o.a==='select'){data=F[tab].filter(r=>(o.t!=='catalogo'||F.session||r.activo));}
  if(o.a==='upsert'){const i=F[tab].findIndex(r=>r[key]===o.p[key]);i>=0?F[tab][i]=Object.assign(F[tab][i],o.p):F[tab].push(o.p)}
  if(o.a==='update'){F[tab].filter(match).forEach(r=>Object.assign(r,o.p))}
  if(o.a==='insert'){F[tab].push(o.p)} if(o.a==='delete'){F[tab]=F[tab].filter(r=>!match(r))}
- F.calls.push({tabla:o.t,accion:o.a,datos:o.p});save(F);return {data,error:null}}
+ F.calls.push({tabla:o.t,accion:o.a,datos:o.p});save(F);return {data:o.one?(data[0]||null):data,error:null}}
 window.supabase={createClient:()=>({
  from:mk,
  rpc:async(n,a)=>{const F=load();F.calls.push({rpc:n,args:a});let data=null;
