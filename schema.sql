@@ -262,3 +262,34 @@ revoke all on function public.reserva_vigente(text,timestamptz) from public;
 grant execute on function public.reserva_vigente(text,timestamptz) to anon, authenticated;
 revoke all on function public.marcar_pago(text,integer,bigint,integer) from public, anon, authenticated;
 grant execute on function public.marcar_pago(text,integer,bigint,integer) to service_role;
+
+-- ---------- Fotos y modelos 3D de los servicios ----------
+alter table public.catalogo add column if not exists imagen text;                -- dirección pública de la foto
+alter table public.catalogo add column if not exists modelo3d text;              -- dirección pública del modelo .glb
+alter table public.catalogo add column if not exists modelo_rot integer not null default 0;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'catalogo_modelo_rot_chk') then
+    alter table public.catalogo add constraint catalogo_modelo_rot_chk check (modelo_rot in (0,90,180,270));
+  end if;
+end $$;
+
+-- Carpetas de archivos (Storage): fotos hasta 5 MB y modelos hasta 30 MB. Se leen en público.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
+  ('servicios', 'servicios', true, 5242880,  array['image/jpeg','image/png','image/webp']),
+  ('modelos',   'modelos',   true, 31457280, null)
+on conflict (id) do update set public = excluded.public,
+  file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "dk ver archivos" on storage.objects;
+create policy "dk ver archivos" on storage.objects for select to anon, authenticated
+  using (bucket_id in ('servicios','modelos'));
+drop policy if exists "dk admin sube archivos" on storage.objects;
+create policy "dk admin sube archivos" on storage.objects for insert to authenticated
+  with check (bucket_id in ('servicios','modelos') and public.es_admin());
+drop policy if exists "dk admin cambia archivos" on storage.objects;
+create policy "dk admin cambia archivos" on storage.objects for update to authenticated
+  using (bucket_id in ('servicios','modelos') and public.es_admin())
+  with check (bucket_id in ('servicios','modelos') and public.es_admin());
+drop policy if exists "dk admin borra archivos" on storage.objects;
+create policy "dk admin borra archivos" on storage.objects for delete to authenticated
+  using (bucket_id in ('servicios','modelos') and public.es_admin());

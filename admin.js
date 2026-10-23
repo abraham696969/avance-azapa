@@ -61,7 +61,7 @@ function render(){
   $$('[data-det]').forEach(b=>b.onclick=()=>{const k=b.dataset.det;openDet.has(k)?openDet.delete(k):openDet.add(k);render()});
   $('#blockList').innerHTML=DB.blocked.length?DB.blocked.map(b=>`<li><span>${fmtDate(b.date)}<br><span class="note">${esc(b.why)}</span></span><button class="btn sm" data-unb="${b.date}">Quitar</button></li>`).join(''):'<li><span class="muted">No hay fechas bloqueadas</span><span></span></li>';
   $$('[data-unb]').forEach(b=>b.onclick=()=>doAct(()=>API.removeBlock(b.dataset.unb),'Fecha desbloqueada'));
-  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td><b>${esc(i.name)}</b><br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
+  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td>${i.img?`<img class="thumb" src="${esc(i.img)}" alt="" loading="lazy"> `:''}<b>${esc(i.name)}</b>${i.model?' <span class="badge ok">3D real</span>':''}<br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
   const quick=id=>{const it=byId(id);const p=Math.max(0,Math.round(+document.querySelector(`[data-pr="${id}"]`).value||0)),k=Math.max(0,Math.round(+document.querySelector(`[data-sk="${id}"]`).value||0));doAct(()=>API.saveService(Object.assign({},it,{price:p,stock:k})),'Servicio actualizado')};
   $$('[data-pr]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.pr));
   $$('[data-sk]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.sk));
@@ -77,10 +77,29 @@ $('#bDate').min=iso(addDays(today,1));
 /* ---------- formulario de servicios ---------- */
 $('#sCat').innerHTML=Object.entries(CATS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 $('#sShape').innerHTML=Object.entries(SHAPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
-function clearForm(){['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
+let pImg=null,pModel=null;   // archivos elegidos y aún no guardados ('quitar' = borrar el actual)
+let curImg='',curModel='';
+function showImg(src){const p=$('#sImgPrev');if(src){p.src=src;p.hidden=false}else{p.removeAttribute('src');p.hidden=true}$('#sImgDel').hidden=!src}
+function showModel(has,name){$('#sModelDel').hidden=!has;$('#sModelNote').textContent=has?('Modelo cargado: '+(name||'actual')+'. Se ajusta al ancho y largo reales.'):'Si no subes uno, el simulador usa una figura simple con las medidas y el color de arriba. El modelo se ajusta solo al ancho y largo reales.'}
+if(API.mode==='demo'){$('#sModel').disabled=true;$('#sModelNote').textContent='Los modelos 3D reales se pueden subir cuando conectes la base de datos (Supabase). En modo demo se usa la figura simple.'}
+$('#sImg').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;const err=$('#sErr');err.hidden=true;
+  if(f.size>15*1024*1024){err.textContent='La foto pesa demasiado (máximo 15 MB).';err.hidden=false;e.target.value='';return}
+  try{const r=await DK.resizeImage(f,1000);pImg=r.blob;showImg(r.dataUrl)}catch(ex){err.textContent=ex.message;err.hidden=false;e.target.value=''}
+});
+$('#sImgDel').onclick=()=>{pImg='quitar';$('#sImg').value='';showImg('')};
+$('#sModel').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;const err=$('#sErr');err.hidden=true;
+  if(!/\.glb$/i.test(f.name)){err.textContent='El modelo debe ser un archivo .glb (no .obj, .fbx ni .gltf suelto).';err.hidden=false;e.target.value='';return}
+  if(f.size>30*1024*1024){err.textContent='El modelo pesa más de 30 MB. Redúcelo (por ejemplo con gltf.report o Blender) para que cargue rápido en el celular.';err.hidden=false;e.target.value='';return}
+  pModel=f;showModel(true,f.name);
+});
+$('#sModelDel').onclick=()=>{pModel='quitar';$('#sModel').value='';showModel(false)};
+function clearForm(){pImg=null;pModel=null;curImg='';curModel='';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value='0';showImg('');showModel(false);['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
 function fillForm(it){
   $('#sId').value=it.id;$('#sName').value=it.name;$('#sDesc').value=it.desc||'';$('#sCat').value=it.cat;$('#sShape').value=it.shape==='land'?'castle':it.shape;
   $('#sPrice').value=it.price;$('#sStock').value=it.stock;$('#sW').value=it.w;$('#sD').value=it.d;$('#sH').value=it.h;$('#sColor').value=numHex(it.color);
+  pImg=null;pModel=null;curImg=it.img||'';curModel=it.model||'';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value=String(it.modelRot||0);showImg(curImg);showModel(!!curModel,'actual');
   $('#svcFormT').textContent='Editar: '+it.name;$('#sCancel').hidden=false;$('#sErr').hidden=true;
   $('#svcForm').scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -94,7 +113,15 @@ $('#svcForm').addEventListener('submit',e=>{
   if(!id){id='s-'+name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)+'-'+Math.random().toString(36).slice(2,5)}
   const old=byId(id)||{};
   const it=Object.assign({},old,{id,name,desc:$('#sDesc').value.trim(),cat:$('#sCat').value,shape:old.id==='parcela'?'land':$('#sShape').value,price,stock,w,d,h,color:parseInt($('#sColor').value.slice(1),16),top:old.top!=null?old.top:0xffffff,active:true});
-  doAct(async()=>{await API.saveService(it);clearForm()},old.id?'Servicio actualizado':'Servicio agregado');
+  it.modelRot=+$('#sModelRot').value||0;
+  doAct(async()=>{
+    const sv=$('#sSave');sv.disabled=true;
+    try{
+      if(pImg==='quitar')it.img='';else if(pImg)it.img=await API.uploadFile('img',pImg,id);
+      if(pModel==='quitar')it.model='';else if(pModel){it.model=await API.uploadFile('model',pModel,id)}
+      await API.saveService(it);clearForm();
+    }finally{sv.disabled=false}
+  },old.id?'Servicio actualizado':'Servicio agregado');
 });
 
 /* ---------- arranque ---------- */

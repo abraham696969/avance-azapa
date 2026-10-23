@@ -316,3 +316,14 @@ header.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5p
 .login .panel{border-top:5px solid var(--pink)}
 @media(max-width:760px){.logo-img{width:48px;height:48px}}
 .login .logo{justify-content:center}
+
+/* ===== Fotos de servicios ===== */
+.card .plan.has-img{height:170px;background:var(--soft)}
+.card .plan.has-img>svg{opacity:0}
+.card .plan>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.card .plan.has-img small{background:color-mix(in srgb,var(--surface) 88%,transparent);padding:2px 8px;border-radius:99px;color:var(--ink);z-index:1}
+.thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:6px;background:var(--soft)}
+.thumb.big{width:96px;height:96px;margin:0;border-radius:12px;border:1px solid var(--line)}
+.upl{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.upl-ctl{display:grid;gap:8px;min-width:0;flex:1}
+input[type=file]{width:100%;font-size:.9rem;padding:8px;border:1.5px dashed var(--line);border-radius:10px;background:var(--bg)}

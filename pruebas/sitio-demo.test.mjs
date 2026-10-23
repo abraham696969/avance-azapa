@@ -39,6 +39,22 @@ await p.reload(); await p.waitForTimeout(800); assert((await p.textContent('#cat
 const id = await p.getAttribute('#catalog article:has-text("Trampolín") [data-add]', 'data-add');
 await p.click(`[data-add="${id}"]`); await p.waitForTimeout(300);
 assert((await p.textContent('#qlines')).includes('Trampolín')); ok('el servicio nuevo entra a la cotización');
+// foto del servicio
+const png = Buffer.from(await a.evaluate(() => { const c = document.createElement('canvas'); c.width = 1600; c.height = 900; const x = c.getContext('2d'); x.fillStyle = '#e8397f'; x.fillRect(0, 0, 1600, 900); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+assert(await a.locator('#sModel').isDisabled()); ok('en modo demo el modelo 3D real avisa que necesita la base de datos');
+await a.locator('#priceBody tr', { hasText: 'Trampolín gigante' }).locator('[data-edit]').click();
+await a.setInputFiles('#sImg', { name: 'foto.png', mimeType: 'image/png', buffer: png }); await a.waitForTimeout(400);
+assert(await a.isVisible('#sImgPrev')); ok('al elegir una foto se ve la vista previa');
+await a.click('#sSave'); await a.waitForTimeout(600);
+assert(await a.locator('#priceBody img.thumb').count() === 1); ok('la foto queda como miniatura en la lista del panel');
+await p.reload(); await p.waitForTimeout(900);
+const im = p.locator('#catalog article:has-text("Trampolín") .plan img');
+assert(await im.count() === 1); await im.scrollIntoViewIfNeeded(); await p.waitForFunction(() => { const i = document.querySelector('#catalog article:has(img) .plan img'); return i && i.complete && i.naturalWidth > 0; });
+const dim = await im.evaluate(i => [i.naturalWidth, i.naturalHeight, i.src.slice(0, 22)]);
+assert(dim[2] === 'data:image/jpeg;base64' && dim[0] === 1000 && dim[1] === 563, JSON.stringify(dim)); ok('la foto sale en el catálogo público, reducida a 1000 px de ancho');
+await a.locator('#priceBody tr', { hasText: 'Trampolín gigante' }).locator('[data-edit]').click(); await a.click('#sImgDel'); await a.click('#sSave'); await a.waitForTimeout(600);
+await p.reload(); await p.waitForTimeout(900); assert(await p.locator('#catalog article:has-text("Trampolín") .plan img').count() === 0); ok('quitar la foto la saca del catálogo');
+await a.setInputFiles('#sImg', { name: 'nota.txt', mimeType: 'text/plain', buffer: Buffer.from('hola') }).catch(() => {});
 // eliminar
 await a.locator('#priceBody tr', { hasText: 'Trampolín gigante' }).locator('[data-del]').click(); await a.waitForTimeout(500);
 assert(!(await a.textContent('#priceBody')).includes('Trampolín gigante')); ok('eliminar lo saca del panel');

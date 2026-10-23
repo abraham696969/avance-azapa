@@ -31,6 +31,7 @@ window.supabase={createClient:()=>({
     F.res.push({folio,fecha:a.p_fecha,franja:a.p_franja,nombre:a.p_nombre,email:a.p_email,telefono:a.p_telefono,invitados:a.p_invitados,items:a.p_items,parcela:a.p_parcela,layout:a.p_layout,total:195000,abono:58500,metodo_pago:a.p_metodo,transaccion:'',estado:data.estado,nota:''})}
   if(n==='estado_reserva')data=F.status;
   save(F);return {data,error:null}},
+ storage:{from:b=>({upload:async(p,file,o)=>{const F=load();(F.uploads=F.uploads||[]).push({bucket:b,path:p,type:o&&o.contentType,size:file.size});save(F);return {data:{path:p},error:null}},getPublicUrl:p=>({data:{publicUrl:'https://fake.supabase.co/storage/v1/object/public/'+b+'/'+p}})})},
  functions:{invoke:async(n,o)=>{const F=load();F.calls.push({fn:n,body:o.body});save(F);return {data:{url:'https://sandbox.flow.cl/pay?token=T'},error:null}}},
  auth:{getSession:async()=>({data:{session:load().session}}),signInWithPassword:async({email})=>{const F=load();F.session={user:{email}};save(F);return {error:null}},signOut:async()=>{const F=load();F.session=null;save(F);return {}}}
 })}})();`;
@@ -81,5 +82,17 @@ await a.fill('#sName', 'Trampolín'); await a.selectOption('#sShape', 'box'); aw
 await a.fill('#sW', '3'); await a.fill('#sD', '3'); await a.fill('#sH', '1.2'); await a.click('#sSave'); await a.waitForTimeout(500);
 const fila = (await a.evaluate(() => JSON.parse(localStorage.__F))).cat.find(r => r.nombre === 'Trampolín');
 assert(fila && fila.forma === 'box' && /^#[0-9a-f]{6}$/i.test(fila.color) && fila.precio === 25000 && fila.ancho === 3 && fila.activo === true); ok('el servicio nuevo se guarda con las columnas que espera la base (forma, color, medidas, precio)');
+// foto y modelo 3D reales se suben a Storage y sus direcciones quedan en el servicio
+const png = Buffer.from(await a.evaluate(() => { const c = document.createElement('canvas'); c.width = 2400; c.height = 1200; const x = c.getContext('2d'); x.fillStyle = '#3e4095'; x.fillRect(0, 0, 2400, 1200); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+assert(!(await a.locator('#sModel').isDisabled())); ok('con base conectada el modelo 3D real sí se puede subir');
+await a.fill('#sName', 'Castillo con modelo'); await a.selectOption('#sShape', 'castle'); await a.fill('#sPrice', '60000'); await a.fill('#sStock', '1');
+await a.fill('#sW', '5'); await a.fill('#sD', '5'); await a.fill('#sH', '4');
+await a.setInputFiles('#sImg', { name: 'f.png', mimeType: 'image/png', buffer: png });
+await a.setInputFiles('#sModel', { name: 'castillo.glb', mimeType: 'model/gltf-binary', buffer: Buffer.alloc(2048, 1) });
+await a.selectOption('#sModelRot', '90'); await a.click('#sSave'); await a.waitForTimeout(900);
+const FF = await a.evaluate(() => JSON.parse(localStorage.__F)), fm = FF.cat.find(r => r.nombre === 'Castillo con modelo');
+assert(FF.uploads.length === 2 && FF.uploads.some(u => u.bucket === 'servicios' && u.type === 'image/jpeg' && /\.jpg$/.test(u.path)) && FF.uploads.some(u => u.bucket === 'modelos' && u.type === 'model/gltf-binary' && /\.glb$/.test(u.path)), JSON.stringify(FF.uploads)); ok('la foto va a la carpeta "servicios" (JPG) y el modelo a "modelos" (.glb)');
+assert(fm.imagen.startsWith('https://fake.supabase.co/storage/v1/object/public/servicios/') && fm.modelo3d.endsWith('.glb') && fm.modelo_rot === 90); ok('en el servicio quedan las direcciones públicas y el giro del modelo');
+assert((await a.textContent('#priceBody')).includes('3D real')); ok('la lista del panel marca los servicios con modelo 3D real');
 await b.close(); srv.close();
 console.log(errs.length ? '\nERRORES DE PÁGINA:\n' + errs.join('\n') : `\nTodo bien: ${n} comprobaciones, sin errores de página.`); process.exit(errs.length ? 1 : 0);

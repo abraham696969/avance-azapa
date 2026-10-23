@@ -137,6 +137,24 @@ En `admin.html`, sección **Agregar servicio** y **Servicios y precios**:
 - **Eliminar:** lo oculta del sitio. Las reservas antiguas lo siguen mostrando con su nombre.
 - El arriendo de la parcela no se puede eliminar.
 
+## Fotos y modelos 3D reales de los servicios
+
+En `admin.html` > **Agregar servicio** (o *Editar*) hay dos campos nuevos:
+
+- **Foto del servicio:** se muestra en el catálogo del sitio. Sirve JPG, PNG o WebP; la página la reduce sola a un tamaño liviano. Funciona también en modo demo.
+- **Modelo 3D real (.glb):** reemplaza la figura simple del simulador por el modelo de verdad. Se ajusta solo al **ancho y largo reales** que escribiste (sin deformarse) y se apoya en el suelo. Si queda de lado, usa **Girar el modelo** (90°, 180° o 270°). Si el modelo falla al cargar, el simulador usa la figura simple y no se rompe nada.
+  Requiere la base de datos real (Supabase); en modo demo el campo aparece bloqueado.
+
+**Importante si ya habías instalado una versión anterior:** vuelve a ejecutar `schema.sql` completo (Supabase > SQL Editor > Run). Agrega las columnas y las carpetas de archivos `servicios` y `modelos` sin borrar tus datos.
+
+### Cómo conseguir modelos 3D que se parezcan a tus juegos
+El simulador no puede "adivinar" cómo es tu castillo o tu tobogán: necesita un modelo 3D. Tres caminos, del más fiel al más rápido:
+1. **Escanear tus propios juegos con el celular.** Hay aplicaciones que arman un modelo 3D desde fotos o video, por ejemplo Polycam, Luma AI o Kiri Engine (algunas cobran por exportar). Se infla el juego, se le da la vuelta grabando y se exporta como `.glb`. Es lo que más se parece a lo que realmente arriendas.
+2. **Encargarlo a un modelador 3D** (freelance). Pídele: formato `.glb`, menos de 10 MB, colores y medidas de tus juegos reales, con la base del modelo apoyada en el suelo.
+3. **Bajar modelos gratis o de pago** de bibliotecas como Sketchfab o Poly Pizza. Filtra por *descargable* y **revisa la licencia**: debe permitir uso comercial, y varias exigen citar al autor. Rara vez habrá uno idéntico al tuyo.
+
+Consejos: el archivo debe ser `.glb` (no `.obj`, `.fbx` ni `.gltf` suelto); ideal menos de **10 MB** (máximo permitido 30 MB) porque en el celular carga por internet móvil. Si pesa mucho, se puede reducir gratis en la página gltf.report. Si tienes Blender: *File > Export > glTF 2.0 > formato "glb"*.
+
 ## Chatbot
 Responde **28 temas** (precios, disponibilidad por fecha, ubicación, horarios, pagos, cancelaciones, montaje, etc.) y deriva a una persona por WhatsApp.
 - En `config.js`, bloque `DK_NEGOCIO`, escribe tu WhatsApp real, dirección, horario de atención, política de cancelación, etc. **Lo que dejes vacío, el chatbot lo deriva a una persona** en vez de inventar una respuesta. Cambia el WhatsApp de ejemplo antes de publicar.
@@ -147,6 +165,7 @@ Necesitan Node.js 22 y Playwright (`npm i playwright`):
 ```
 node --experimental-strip-types pruebas/flow-mock.test.mjs   # funciones de pago contra un Flow simulado
 node pruebas/chatbot.test.mjs                                # 30 consultas del chatbot
+node pruebas/ajuste-modelo.test.mjs                          # cómo se ajusta un modelo 3D real al ancho y largo
 node pruebas/sitio-demo.test.mjs                             # recorrido completo en modo demo
 node pruebas/sitio-flow.test.mjs                             # recorrido con pago en línea (base simulada)
 ```

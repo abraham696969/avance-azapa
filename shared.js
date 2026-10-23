@@ -57,13 +57,47 @@ function applyCatalog(cat){
     if(c.top!=null)it.top=typeof c.top==='number'?c.top:hexNum(c.top);
     if(c.shape)it.shape=c.shape;
     if(c.active!=null)it.active=!!c.active;
+    if(c.img!==undefined)it.img=c.img||'';
+    if(c.model!==undefined)it.model=c.model||'';
+    if(c.modelRot!=null)it.modelRot=+c.modelRot||0;
   });
   CAT.length=0;ALL.filter(i=>i.active!==false||i.id==='parcela').forEach(i=>CAT.push(i));
   DESIGN.length=0;CAT.filter(i=>i.id!=='parcela').forEach(i=>DESIGN.push(i));
 }
 const SHAPES={castle:'Inflable con torres',slide:'Tobogán inflable',field:'Cancha inflable',table:'Mesa de juego',pingpong:'Mesa de ping pong',machine:'Máquina o carro de comida',pool:'Piscina',box:'Otro objeto (caja)'};
-const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false});
-const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo});
+const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false,imagen:it.img||null,modelo3d:it.model||null,modelo_rot:it.modelRot||0});
+const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo,img:x.imagen||'',model:x.modelo3d||'',modelRot:x.modelo_rot||0});
+
+
+/* ============ Fotos y modelos 3D ============ */
+/* Reduce una foto a máx. 1000 px y la comprime (JPEG). Devuelve {blob,dataUrl}. */
+function resizeImage(file,max){
+  max=max||1000;
+  return new Promise((res,rej)=>{
+    if(!/^image\//.test(file.type||''))return rej(new Error('El archivo no es una imagen.'));
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{
+      const k=Math.min(1,max/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*k)),h=Math.max(1,Math.round(img.height*k));
+      const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
+      x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+      c.toBlob(b=>b?res({blob:b,dataUrl:c.toDataURL('image/jpeg',.82)}):rej(new Error('No se pudo procesar la imagen.')),'image/jpeg',.82);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('No se pudo leer la imagen. Prueba con un JPG o PNG.'))};
+    img.src=url;
+  });
+}
+/* Cómo colocar un modelo 3D real dentro de la huella ancho x largo del servicio (solo giros de 90 grados).
+   min/max = caja del modelo [x,y,z]. Devuelve {scale,pos:[x,y,z]} para un grupo con rotation.y = rotDeg. */
+function fitGLB(min,max,rotDeg,w,d){
+  const sx=max[0]-min[0],sy=max[1]-min[1],sz=max[2]-min[2];
+  if(!(sx>0&&sz>0&&sy>0&&w>0&&d>0)||![sx,sy,sz].every(isFinite))return null;
+  const r=(((Math.round(rotDeg/90)%4)+4)%4)*Math.PI/2,c=Math.round(Math.cos(r)),sn=Math.round(Math.sin(r));
+  const swap=Math.abs(sn)===1,fx=swap?sz:sx,fz=swap?sx:sz;
+  const k=Math.min(w/fx,d/fz);
+  const cx=(min[0]+max[0])/2,cz=(min[2]+max[2])/2;
+  const rx=cx*c+cz*sn,rz=-cx*sn+cz*c;
+  return {scale:k,pos:[-k*rx,-k*min[1],-k*rz],size:[k*fx,k*sy,k*fz]};
+}
 
 /* ============ Acceso a datos ============ */
 const cfg=window.DK_CONFIG||{};
@@ -213,8 +247,23 @@ const API={
   async saveService(it){
     if(LIVE){ok(await sb().from('catalogo').upsert(rowOf(it),{onConflict:'item_id'}));return}
     const s=demoLoad();s.catalog=s.catalog||{};
-    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false};
+    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false,img:it.img||'',model:'',modelRot:0};
     demoSave(s);
+  },
+  /* Sube una foto (kind='img') o un modelo .glb (kind='model') y devuelve la dirección pública.
+     En modo demo la foto se guarda dentro del navegador; los modelos 3D necesitan la base real. */
+  async uploadFile(kind,fileOrBlob,hint){
+    const safe=String(hint||'servicio').toLowerCase().replace(/[^a-z0-9-]+/g,'-').slice(0,30);
+    if(!LIVE){
+      if(kind==='model')throw new Error('Subir modelos 3D requiere la base de datos real (Supabase). En modo demo se usa la figura simple.');
+      return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(new Error('No se pudo leer la imagen.'));fr.readAsDataURL(fileOrBlob)});
+    }
+    const ext=kind==='model'?'glb':'jpg';
+    const path=safe+'-'+Date.now().toString(36)+'.'+ext;
+    const st=sb().storage.from(kind==='model'?'modelos':'servicios');
+    const up=await st.upload(path,fileOrBlob,{upsert:true,contentType:kind==='model'?'model/gltf-binary':'image/jpeg',cacheControl:'31536000'});
+    if(up.error)throw new Error(up.error.message);
+    return st.getPublicUrl(path).data.publicUrl;
   },
   /* "eliminar" = ocultar del sitio; las reservas antiguas siguen mostrando su servicio */
   async deleteService(id){
@@ -225,5 +274,5 @@ const API={
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB};
 })();

@@ -81,6 +81,27 @@
               <div class="field"><label for="sH">Alto (m)</label><input id="sH" type="number" min="0.2" max="8" step="0.1" inputmode="decimal"></div>
               <div class="field"><label for="sColor">Color en el simulador</label><input id="sColor" type="color" value="#3d7bff" style="padding:2px;height:44px"></div>
             </div>
+            <div class="field">
+              <label for="sImg">Foto del servicio (opcional)</label>
+              <div class="upl">
+                <img id="sImgPrev" class="thumb big" alt="" hidden>
+                <div class="upl-ctl">
+                  <input id="sImg" type="file" accept="image/jpeg,image/png,image/webp">
+                  <button class="btn sm ghost" type="button" id="sImgDel" hidden>Quitar foto</button>
+                </div>
+              </div>
+              <span class="note">Se muestra en el catálogo del sitio. Se reduce sola a un tamaño liviano.</span>
+            </div>
+            <div class="field">
+              <label for="sModel">Modelo 3D real (opcional, archivo .glb)</label>
+              <input id="sModel" type="file" accept=".glb,model/gltf-binary">
+              <div class="two" style="margin-top:8px">
+                <div class="field"><label for="sModelRot">Girar el modelo</label>
+                  <select id="sModelRot"><option value="0">No girar</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn sm ghost" type="button" id="sModelDel" hidden>Quitar modelo</button></div>
+              </div>
+              <span class="note" id="sModelNote">Si no subes uno, el simulador usa una figura simple con las medidas y el color de arriba. El modelo se ajusta solo al ancho y largo reales.</span>
+            </div>
             <p class="note" id="sErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
             <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit" id="sSave">Guardar servicio</button><button class="btn ghost" type="button" id="sCancel" hidden>Cancelar edición</button></div>
           </form>

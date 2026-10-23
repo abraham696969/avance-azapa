@@ -37,7 +37,7 @@ function renderCatalog(){
     const left=avail(it.id,S.date,S.slot);
     const inDesign=it.id==='parcela'?(S.parcela?1:0):countOf(it.id);
     const stockB=left===0?'<span class="badge bad">Sin disponibilidad</span>':`<span class="badge ${left<=1?'warn':'ok'}">${left} disponible${left>1?'s':''} esa fecha</span>`;
-    el.innerHTML=`<div class="plan">${planSVG(it)}<small>${it.w} × ${it.d} m</small></div>
+    el.innerHTML=`<div class="plan${it.img?' has-img':''}">${planSVG(it)}${it.img?`<img src="${esc(it.img)}" alt="${esc(it.name)}" loading="lazy" decoding="async" onerror="this.remove()">`:''}<small>${it.w} × ${it.d} m</small></div>
       <div class="body"><h3>${esc(it.name)}</h3><p>${esc(it.desc)}</p>
       <div class="row"><span class="price num">${CLP(it.price)}<small> / evento</small></span>${stockB}</div>
       <div class="row"><span class="note">${inDesign?'En tu diseño: '+inDesign:'No está en tu diseño'}</span>
@@ -122,7 +122,31 @@ function build(it){
       g.add(cyl(w/2,w/2,h,0xeeeeee));const wt=cyl(w/2-.15,w/2-.15,h*.9,c,0,.05,0);g.add(wt);
       const wt2=new THREE.Mesh(new THREE.CircleGeometry(w/2-.15,32),new THREE.MeshLambertMaterial({color:0x7fd0ff}));wt2.rotation.x=-Math.PI/2;wt2.position.y=h+.01;g.add(wt2);break;
   }
+  // si el servicio tiene un modelo 3D real (.glb), se carga y reemplaza la figura simple
+  if(it.model&&THREE_OK&&THREE.GLTFLoader){
+    loadModel(it.model).then(src=>{const r=realModel(src,it);if(!r)return;while(g.children.length)g.remove(g.children[0]);g.add(r);render()})
+      .catch(e=>{console.warn('No se pudo cargar el modelo 3D de',it.name,e);MODEL_CACHE.delete(it.model)});
+  }
   return g;
+}
+/* ----- modelos 3D reales (.glb) con respaldo: si falla la carga se queda la figura simple ----- */
+const MODEL_CACHE=new Map();
+function loadModel(url){
+  if(!MODEL_CACHE.has(url))MODEL_CACHE.set(url,new Promise((ok,fail)=>{
+    if(!THREE.GLTFLoader)return fail(new Error('GLTFLoader no disponible'));
+    new THREE.GLTFLoader().load(url,gl=>ok(gl.scene),undefined,fail)}));
+  return MODEL_CACHE.get(url);
+}
+function realModel(src,it){
+  const m=src.clone(true);
+  m.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material=Array.isArray(o.material)?o.material.map(x=>x.clone()):o.material.clone()}});
+  m.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(m);
+  const f=DK.fitGLB([b.min.x,b.min.y,b.min.z],[b.max.x,b.max.y,b.max.z],it.modelRot||0,it.w,it.d);
+  if(!f)return null;
+  const holder=new THREE.Group();holder.add(m);
+  holder.rotation.y=(it.modelRot||0)*Math.PI/180;holder.scale.setScalar(f.scale);holder.position.set(f.pos[0],f.pos[1],f.pos[2]);
+  return holder;
 }
 function setEmissive(g,hex){if(!g.traverse)return;g.traverse(o=>{if(o.material&&o.material.emissive)o.material.emissive.setHex(hex)})}
 function makeLabel(text){
