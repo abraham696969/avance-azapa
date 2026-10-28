@@ -7,7 +7,7 @@ const srv = await servir(root); const b = await chromium.launch({ executablePath
 const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
 const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const a = await ctx.newPage(); a.on('pageerror', e => errs.push(e.message)); a.on('dialog', d => d.accept());
-await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600);
+await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600); await a.click('[data-tab=catalogo]');
 await a.click('#tPreset'); await a.waitForTimeout(200);
 assert.equal(await a.inputValue('#tW'), '48'); assert.equal(await a.inputValue('#tD'), '44'); assert.equal(await a.inputValue('#tGround'), 'tierra'); assert.equal(await a.locator('#tePlan .it').count(), 8); ok('el botón carga 48 × 44 m, suelo de tierra y los 8 elementos de la foto');
 await a.click('#tSave'); await a.waitForTimeout(500);

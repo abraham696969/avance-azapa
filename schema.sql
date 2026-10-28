@@ -58,6 +58,10 @@ alter table public.reservas add column if not exists flow_token text;
 alter table public.reservas add column if not exists flow_orden bigint;
 alter table public.reservas add column if not exists pagada_en  timestamptz;
 alter table public.reservas add column if not exists nota       text;
+-- datos del niño o niña cumpleañero/a (para la cartera de clientes y el aviso de cumpleaños)
+alter table public.reservas add column if not exists nombre_nino      text;
+alter table public.reservas add column if not exists nacimiento_nino  date;
+alter table public.reservas add column if not exists acepta_datos     boolean not null default false;
 
 -- estados: por_pagar (esperando el pago en Flow), pendiente (el equipo debe validar), confirmada, finalizada, cancelada
 alter table public.reservas drop constraint if exists reservas_estado_check;
@@ -114,10 +118,12 @@ $$;
 -- p_online = true  -> queda "por_pagar" (30 min de plazo) y se paga en Flow
 -- p_online = false -> queda "pendiente" y el equipo valida el abono a mano
 drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text);
+drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean);
 create or replace function public.crear_reserva(
   p_fecha date, p_franja text, p_nombre text, p_email text, p_telefono text,
   p_invitados integer, p_items jsonb, p_parcela boolean, p_layout jsonb,
-  p_metodo text, p_transaccion text, p_online boolean default false
+  p_metodo text, p_transaccion text, p_online boolean default false,
+  p_nino text default null, p_nacimiento date default null, p_acepta boolean default false
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -131,6 +137,10 @@ begin
   if length(regexp_replace(coalesce(p_telefono,''), '\D', '', 'g')) < 8 then raise exception 'Teléfono no válido.'; end if;
   if p_invitados is null or p_invitados < 1 or p_invitados > 200 then raise exception 'Cantidad de invitados no válida.'; end if;
   if jsonb_typeof(coalesce(p_items,'{}'::jsonb)) <> 'object' then raise exception 'Servicios no válidos.'; end if;
+  if length(trim(coalesce(p_nino,''))) < 2 then raise exception 'Escribe el nombre del niño o niña cumpleañero/a.'; end if;
+  if p_nacimiento is null or p_nacimiento > current_date or p_nacimiento < current_date - interval '25 years' then
+    raise exception 'La fecha de nacimiento del niño o niña no es válida.'; end if;
+  if not coalesce(p_acepta,false) then raise exception 'Debes aceptar el uso de los datos para continuar.'; end if;
 
   -- Evita dos reservas simultáneas para la misma fecha y franja
   perform pg_advisory_xact_lock(hashtext(p_fecha::text || p_franja));
@@ -169,11 +179,12 @@ begin
   v_estado := case when coalesce(p_online,false) then 'por_pagar' else 'pendiente' end;
 
   insert into public.reservas (folio, fecha, franja, nombre, email, telefono, invitados, items, parcela, layout,
-                               total, abono, metodo_pago, transaccion, estado, expira)
+                               total, abono, metodo_pago, transaccion, estado, expira, nombre_nino, nacimiento_nino, acepta_datos)
   values (v_folio, p_fecha, p_franja, trim(p_nombre), trim(p_email), trim(p_telefono), p_invitados,
           coalesce(p_items,'{}'::jsonb), coalesce(p_parcela,true), coalesce(p_layout,'[]'::jsonb),
           v_total, v_abono, p_metodo, p_transaccion, v_estado,
-          case when v_estado = 'por_pagar' then now() + interval '30 minutes' end)
+          case when v_estado = 'por_pagar' then now() + interval '30 minutes' end,
+          trim(p_nino), p_nacimiento, true)
   returning codigo into v_codigo;
 
   return jsonb_build_object('folio', v_folio, 'codigo', v_codigo, 'total', v_total, 'abono', v_abono, 'estado', v_estado);
@@ -250,8 +261,8 @@ create policy "admin gestiona bloqueos" on public.fechas_bloqueadas
   for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 -- Permisos de ejecución de las funciones
-revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean) from public;
-grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean) to anon, authenticated;
+revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean) from public;
+grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean) to anon, authenticated;
 revoke all on function public.disponibilidad() from public;
 grant execute on function public.disponibilidad() to anon, authenticated;
 revoke all on function public.es_admin() from public;
@@ -320,4 +331,52 @@ drop policy if exists "todos ven el terreno" on public.terreno;
 create policy "todos ven el terreno" on public.terreno for select to anon, authenticated using (true);
 drop policy if exists "admin gestiona el terreno" on public.terreno;
 create policy "admin gestiona el terreno" on public.terreno
+  for all to authenticated using (public.es_admin()) with check (public.es_admin());
+
+
+-- ---------- Cartera de clientes, ofertas y propuestas de cumpleaños ----------
+-- Clientes que no vinieron por el sitio (anteriores o por WhatsApp). Los de las reservas se leen de "reservas".
+create table if not exists public.clientes_extra (
+  id          bigint generated always as identity primary key,
+  apoderado   text not null,
+  nino        text not null,
+  nacimiento  date,
+  celular     text not null,
+  correo      text,
+  arrendo     text,            -- qué arrendó
+  fecha_evento date,
+  monto       integer check (monto is null or monto >= 0),
+  notas       text,
+  creado      timestamptz not null default now()
+);
+alter table public.clientes_extra enable row level security;
+drop policy if exists "admin gestiona clientes" on public.clientes_extra;
+create policy "admin gestiona clientes" on public.clientes_extra
+  for all to authenticated using (public.es_admin()) with check (public.es_admin());
+
+-- Tablón de ofertas (se muestran en el sitio mientras estén activas y no hayan vencido)
+create table if not exists public.ofertas (
+  id      bigint generated always as identity primary key,
+  titulo  text not null check (length(titulo) between 3 and 80),
+  texto   text not null check (length(texto) between 3 and 400),
+  hasta   date,
+  activa  boolean not null default true,
+  creada  timestamptz not null default now()
+);
+alter table public.ofertas enable row level security;
+drop policy if exists "publico ve ofertas vigentes" on public.ofertas;
+create policy "publico ve ofertas vigentes" on public.ofertas for select to anon, authenticated
+  using (activa and (hasta is null or hasta >= current_date));
+drop policy if exists "admin gestiona ofertas" on public.ofertas;
+create policy "admin gestiona ofertas" on public.ofertas
+  for all to authenticated using (public.es_admin()) with check (public.es_admin());
+
+-- Registro de propuestas de cumpleaños ya enviadas (una por niño y año)
+create table if not exists public.propuestas (
+  clave   text primary key,       -- "celular|niño|año"
+  enviada timestamptz not null default now()
+);
+alter table public.propuestas enable row level security;
+drop policy if exists "admin gestiona propuestas" on public.propuestas;
+create policy "admin gestiona propuestas" on public.propuestas
   for all to authenticated using (public.es_admin()) with check (public.es_admin());

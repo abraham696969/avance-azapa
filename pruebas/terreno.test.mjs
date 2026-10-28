@@ -16,7 +16,7 @@ await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
 let t = await p.evaluate(() => ({ w: DK.TERR.w, d: DK.TERR.d, n: DK.OBST.length, ground: DK.TERR.ground }));
 assert.deepEqual(t, { w: 30, d: 20, n: 4, ground: 'pasto' }); ok('sin configuración, el sitio usa el terreno de ejemplo (30 × 20 m, quincho y 3 árboles)');
 
-await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600);
+await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600); await a.click('[data-tab=catalogo]');
 assert.equal(await a.locator('#tePlan .it').count(), 4); assert.equal(await a.inputValue('#tW'), '30'); ok('el panel muestra el plano con los 4 elementos y las medidas');
 
 // arrastrar el quincho con el mouse
@@ -68,7 +68,7 @@ await a.locator('#resBody [data-det]').first().click(); await a.waitForTimeout(2
 assert.equal(await a.locator('.detail svg').first().getAttribute('viewBox'), '-20 -12.5 40 25'); ok('el plano de cada reserva usa las medidas del terreno guardado');
 
 // volver al ejemplo
-await a.locator('#tePlan').scrollIntoViewIfNeeded(); await a.click('#tReset'); await a.waitForTimeout(200);
+await a.click('[data-tab=catalogo]'); await a.locator('#tePlan').scrollIntoViewIfNeeded(); await a.click('#tReset'); await a.waitForTimeout(200);
 assert.equal(await a.locator('#tePlan .it').count(), 4); assert.equal(await a.inputValue('#tW'), '30'); assert.equal(await a.locator('#tePlan image').count(), 0); ok('"Volver al terreno de ejemplo" restaura medidas, elementos y quita la foto');
 await a.click('#tSave'); await a.waitForTimeout(700); await p.reload(); await p.waitForTimeout(800);
 t = await p.evaluate(() => ({ w: DK.TERR.w, photo: DK.TERR.photo, n: DK.OBST.length })); assert.deepEqual(t, { w: 30, photo: '', n: 4 }); ok('guardado el ejemplo, el sitio vuelve a 30 × 20');

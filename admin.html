@@ -46,10 +46,20 @@
   <main class="wrap">
     <section id="admin" style="padding-top:28px">
       <div class="sec-head"><p class="eyebrow">Panel de administración</p><h2>Lo que ve la empresa</h2>
-        <p>Reservas con su distribución, estados, bloqueo de fechas y precios.</p></div>
+        <p>Reservas, cartera de clientes, cumpleaños, balance mensual, ofertas y catálogo.</p></div>
+      <nav class="atabs" id="aTabs" aria-label="Secciones del panel">
+        <button type="button" data-tab="reservas" class="on">Reservas</button>
+        <button type="button" data-tab="clientes">Clientes</button>
+        <button type="button" data-tab="cumple">Cumpleaños</button>
+        <button type="button" data-tab="balance">Balance</button>
+        <button type="button" data-tab="ofertas">Ofertas</button>
+        <button type="button" data-tab="catalogo">Servicios y terreno</button>
+      </nav>
+
+      <div class="tabpane" id="tab-reservas">
       <div class="metrics num" id="metrics"></div>
       <div class="panel"><h3 style="margin-bottom:10px">Reservas</h3><div class="tablewrap"><table><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Abono</th><th>Estado</th><th></th></tr></thead><tbody id="resBody"></tbody></table></div></div>
-      <div class="adm2">
+      <div style="margin-top:20px">
         <div class="panel">
           <h3>Bloquear fechas</h3>
           <form class="f" id="blockForm" style="margin-top:12px" novalidate>
@@ -59,7 +69,88 @@
           </form>
           <ul class="lines" id="blockList" style="margin-top:12px"></ul>
         </div>
+      </div>
+      </div>
+
+      <div class="tabpane" id="tab-clientes" hidden>
         <div class="panel">
+          <div class="bar">
+            <div><h3>Cartera de clientes</h3><p class="note">Se llena sola con cada reserva del sitio. Aquí también puedes agregar clientes anteriores.</p></div>
+            <div class="bar-r"><input id="cSearch" type="search" placeholder="Buscar por nombre, niño o celular" aria-label="Buscar cliente"><button class="btn sm" type="button" id="xlsClientes">Descargar Excel</button></div>
+          </div>
+          <div class="tablewrap"><table style="min-width:760px"><thead><tr><th>Apoderado</th><th>Niño/a</th><th>Nacimiento</th><th>Celular</th><th>Eventos</th><th>Lo que arrendó</th><th>Pagado</th><th></th></tr></thead><tbody id="cliBody"></tbody></table></div>
+        </div>
+        <div class="panel" style="margin-top:20px">
+          <h3 id="cFormT">Agregar cliente</h3>
+          <form class="f" id="cliForm" style="margin-top:12px" novalidate>
+            <input type="hidden" id="kId">
+            <div class="two"><div class="field"><label for="kApo">Nombre del apoderado</label><input id="kApo" maxlength="80"></div>
+              <div class="field"><label for="kNino">Nombre del niño o niña</label><input id="kNino" maxlength="60"></div></div>
+            <div class="two"><div class="field"><label for="kNac">Fecha de nacimiento</label><input id="kNac" type="date"></div>
+              <div class="field"><label for="kCel">Número de celular</label><input id="kCel" type="tel" inputmode="tel" placeholder="+56 9 1234 5678"></div></div>
+            <div class="two"><div class="field"><label for="kMail">Correo (opcional)</label><input id="kMail" type="email"></div>
+              <div class="field"><label for="kArr">Qué arrendó</label><input id="kArr" maxlength="120" placeholder="Ej.: Parcela, castillo inflable y algodón de azúcar"></div></div>
+            <div class="two"><div class="field"><label for="kFecha">Fecha del evento</label><input id="kFecha" type="date"></div>
+              <div class="field"><label for="kMonto">Monto pagado (CLP)</label><input id="kMonto" type="number" min="0" step="1000" inputmode="numeric"></div></div>
+            <div class="field"><label for="kNotas">Notas</label><input id="kNotas" maxlength="200"></div>
+            <p class="note" id="kErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit">Guardar cliente</button><button class="btn ghost" type="button" id="kCancel" hidden>Cancelar edición</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="tabpane" id="tab-cumple" hidden>
+        <div class="panel">
+          <h3>Cumpleañeros destacados</h3>
+          <p class="note" style="margin:4px 0 12px">Niños de la cartera que están de cumpleaños (o lo estuvieron hace poco) y que ya arrendaron un servicio.</p>
+          <div class="hl" id="cumpleHl"></div>
+        </div>
+        <div class="panel" style="margin-top:20px">
+          <div class="bar"><div><h3>Propuestas de cumpleaños por enviar</h3><p class="note">Aparecen un mes antes del cumpleaños (hasta 35 días antes) para los clientes que ya arrendaron. El botón abre WhatsApp con el mensaje listo; tú solo lo envías.</p></div></div>
+          <div class="field" style="margin:12px 0"><label for="msgTpl">Mensaje (puedes editarlo)</label>
+            <textarea id="msgTpl" rows="6"></textarea>
+            <span class="note">Se reemplazan solos: {apoderado}, {nino}, {edad}, {fecha}, {ofertas} y {sitio}.</span></div>
+          <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Niño/a</th><th>Cumple</th><th>Apoderado</th><th>Celular</th><th></th></tr></thead><tbody id="propBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div class="tabpane" id="tab-balance" hidden>
+        <div class="panel">
+          <div class="bar">
+            <div><h3>Balance mensual</h3><p class="note">Se ordena por la fecha del evento. Confirmada = abono cobrado; Finalizada = evento realizado y saldo cobrado.</p></div>
+            <div class="bar-r"><select id="balYear" aria-label="Año"></select><button class="btn sm" type="button" id="xlsBalance">Descargar Excel</button></div>
+          </div>
+          <div class="metrics num" id="balMetrics" style="margin:12px 0"></div>
+          <div class="tablewrap"><table style="min-width:680px"><thead><tr><th>Mes</th><th>Eventos</th><th>Contratado</th><th>Abonos</th><th>Saldos cobrados</th><th>Cobrado</th><th>Por cobrar</th></tr></thead><tbody id="balBody"></tbody></table></div>
+          <div class="bars" id="balBars" aria-hidden="true"></div>
+        </div>
+        <div class="panel" style="margin-top:20px">
+          <div class="bar"><div><h3>Eventos del mes</h3></div><div class="bar-r"><select id="balMonth" aria-label="Mes"></select></div></div>
+          <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Fecha</th><th>Cliente</th><th>Niño/a</th><th>Qué arrendó</th><th>Total</th><th>Estado</th></tr></thead><tbody id="evBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div class="tabpane" id="tab-ofertas" hidden>
+        <div class="adm2">
+          <div class="panel">
+            <h3 id="oFormT">Nueva oferta</h3>
+            <p class="note" style="margin:4px 0 0">Las ofertas activas se muestran en el sitio y se incluyen en las propuestas de cumpleaños.</p>
+            <form class="f" id="ofForm" style="margin-top:12px" novalidate>
+              <input type="hidden" id="oId">
+              <div class="field"><label for="oTit">Título</label><input id="oTit" maxlength="80" placeholder="Ej.: Ofertas de noviembre"></div>
+              <div class="field"><label for="oTxt">Detalle</label><textarea id="oTxt" rows="3" maxlength="400" placeholder="Qué incluye y condiciones"></textarea></div>
+              <div class="two"><div class="field"><label for="oHasta">Válida hasta (opcional)</label><input id="oHasta" type="date"></div>
+                <div class="field"><label for="oAct">Estado</label><select id="oAct"><option value="1">Activa (visible)</option><option value="0">Oculta</option></select></div></div>
+              <p class="note" id="oErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit">Guardar oferta</button><button class="btn ghost" type="button" id="oCancel" hidden>Cancelar edición</button></div>
+            </form>
+          </div>
+          <div class="panel"><h3>Ofertas publicadas</h3><ul class="lines" id="ofList" style="margin-top:12px"></ul></div>
+        </div>
+      </div>
+
+      <div class="tabpane" id="tab-catalogo" hidden>
+      <div class="panel">
           <h3 id="svcFormT">Agregar servicio</h3>
           <form class="f" id="svcForm" style="margin-top:12px" novalidate>
             <input type="hidden" id="sId">
@@ -106,7 +197,7 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit" id="sSave">Guardar servicio</button><button class="btn ghost" type="button" id="sCancel" hidden>Cancelar edición</button></div>
           </form>
         </div>
-      </div>
+      <div style="margin-top:20px"></div>
       <div class="panel" id="terrenoPanel" style="margin-top:20px">
         <h3>Terreno de la parcela (simulador 3D)</h3>
         <p class="note" style="margin:4px 0 12px">Aquí dejas el terreno como es en la realidad: medidas, suelo, dónde están el quincho, los árboles, los baños, etc. Arrastra los elementos en el plano. Los clientes no podrán poner juegos encima de ellos.</p>
@@ -175,6 +266,7 @@
         <p class="note" style="margin:4px 0 8px">Los cambios de precio y stock se guardan al salir del campo. "Eliminar" oculta el servicio del sitio; las reservas antiguas lo siguen mostrando.</p>
         <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Servicio</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Medidas</th><th></th></tr></thead><tbody id="priceBody"></tbody></table></div>
       </div>
+      </div>
     </section>
     <footer><span>Divertí Kids · Panel interno</span><span><a href="index.html" style="color:inherit">Ver sitio de clientes</a></span></footer>
   </main>
@@ -184,6 +276,7 @@
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="shared.js"></script>
 <script src="admin.js"></script>
 </body>

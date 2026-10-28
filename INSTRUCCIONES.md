@@ -137,6 +137,25 @@ En `admin.html`, sección **Agregar servicio** y **Servicios y precios**:
 - **Eliminar:** lo oculta del sitio. Las reservas antiguas lo siguen mostrando con su nombre.
 - El arriendo de la parcela no se puede eliminar.
 
+## Clientes, cumpleaños, balance y ofertas (panel admin)
+
+El panel tiene seis pestañas:
+
+- **Reservas:** lo de siempre (estados, distribución 3D, bloqueo de fechas).
+- **Clientes:** la cartera. Cada reserva del sitio agrega sola al apoderado, al niño, su nacimiento, el celular y lo que arrendó. También puedes **agregar a mano** clientes anteriores (formulario de abajo). Botón **Descargar Excel**: hojas *Clientes*, *Eventos* (ordenados por fecha, con el mes) y *Cumpleaños*.
+- **Cumpleaños:** arriba, los cumpleañeros **destacados** (los que cumplen en los próximos 30 días o cumplieron hace menos de 15 y ya arrendaron algo). Abajo, las **propuestas por enviar**: aparecen hasta 35 días antes del cumpleaños. El botón *Enviar por WhatsApp* abre WhatsApp con el mensaje ya escrito (apoderado, niño, edad, ofertas vigentes y enlace al sitio); tú solo lo envías y luego pulsas *Marcar enviada* para que no se repita ese año. El texto del mensaje se puede editar (se guarda en ese navegador).
+- **Balance:** por mes y año, según la fecha del evento: eventos, contratado, abonos, saldos cobrados, cobrado y por cobrar, con un Excel descargable. Regla: **Confirmada** = abono cobrado; **Finalizada** = el evento se hizo y el saldo se cobró (cámbiala a mano en *Reservas* cuando cobres el saldo); **Pendiente** = el abono aún no se valida; **Cancelada** no cuenta.
+- **Ofertas:** el tablón de ofertas. Las activas y no vencidas se muestran en una sección del sitio (con botón a WhatsApp) y se incluyen en las propuestas de cumpleaños.
+- **Servicios y terreno:** el catálogo y el editor del terreno.
+
+**Importante al actualizar una base ya creada:** vuelve a pegar el `schema.sql` completo en Supabase (es seguro repetirlo). Agrega los datos del niño a las reservas y las tablas de clientes, ofertas y propuestas.
+
+**Datos personales:** el sitio pide el nombre y la fecha de nacimiento del niño y una casilla de aceptación para guardarlos. Los datos solo los ve el equipo con sesión iniciada. Si un apoderado pide que borren sus datos, hazlo desde Supabase (tabla *reservas* o *clientes_extra*). Conviene revisar con alguien de confianza el aviso de privacidad según la Ley 19.628 (y la Ley 21.719, que la reemplaza).
+
+**Sobre el "agente" de cumpleaños:** el envío automático de WhatsApp sin que nadie pulse un botón solo existe con la API oficial de WhatsApp Business, que tiene costo. Por eso el panel deja el mensaje listo para enviarlo con un clic. Si más adelante quieren automatizarlo, solo hay que cambiar ese botón por una llamada a la API.
+
+**Redes y WhatsApp:** se configuran en `config.js` (`instagram`, `facebook`, `tiktok` y `whatsapp`). Si dejas uno vacío, su ícono se oculta.
+
 ## Fotos y modelos 3D reales de los servicios
 
 En `admin.html` > **Agregar servicio** (o *Editar*) hay dos campos nuevos:
@@ -190,6 +209,7 @@ node pruebas/sitio-flow.test.mjs                             # recorrido con pag
 node pruebas/terreno.test.mjs                                # editor del terreno, guardado y uso en el sitio
 node pruebas/parcela-diverti.test.mjs                        # botón "Cargar mi parcela"
 node pruebas/texturas.test.mjs                               # texturas y sólido/intangible
+node pruebas/cartera.test.mjs                                # clientes, cumpleaños, balance, Excel, ofertas y redes
 node pruebas/terreno-3d.test.mjs                             # qué se dibuja en el 3D según el terreno (con 3D simulado)
 ```
 

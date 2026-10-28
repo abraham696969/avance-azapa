@@ -1,7 +1,7 @@
 (async function(){
 'use strict';
-const {$,$$,CLP,esc,iso,parseISO,fmtDate,today,addDays,toast,SLOTS,CAT,CATS,SHAPES,byId,OBST,TERR,API,applyCatalog,numHex}=DK;
-let DB={res:[],blocked:[],catalog:{}};
+const {$,$$,CLP,esc,iso,parseISO,fmtDate,today,addDays,toast,SLOTS,CAT,CATS,SHAPES,byId,OBST,TERR,API,applyCatalog,numHex,MESES}=DK;
+let DB={res:[],blocked:[],catalog:{},clientes:[],ofertas:[],propuestas:[]};
 const openDet=new Set();
 
 /* ---------- vistas ---------- */
@@ -29,7 +29,7 @@ async function reload(){
   applyCatalog(DB.catalog);
   DK.applyTerrain(DB.terrain||DK.DEFAULT_TERRAIN);
   if(!TE.dirty)teLoad();      // no pisa lo que se está editando en el plano
-  render();
+  render();renderExtra();
 }
 async function doAct(fn,okMsg){
   try{await fn();await reload();if(okMsg)toast(okMsg)}
@@ -228,6 +228,140 @@ $('#tPreset').onclick=()=>{
   const had=!!TE.t.photo||!!TE.photoPrev,hadM=!!TE.t.model;
   TE.t=DK.sanitizeTerrain(DK.PRESET_DIVERTI);TE.sel=null;TE.photoPrev='';TE.pPhoto=had?'quitar':null;TE.pModel=hadM?'quitar':null;TE.dirty=true;teFill();teDraw();teSel();
 };
+
+
+/* ============ Pestañas, cartera, cumpleaños, balance y ofertas ============ */
+function setTab(t){$$('#aTabs [data-tab]').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));$$('.tabpane').forEach(p=>p.hidden=p.id!=='tab-'+t)}
+$$('#aTabs [data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+const fd=s=>s?s.split('-').reverse().join('-'):'—';
+const MES=m=>MESES[m][0].toUpperCase()+MESES[m].slice(1);
+const ageOf=nac=>{if(!nac)return '';const b=parseISO(nac);let a=today.getFullYear()-b.getFullYear();if(today<new Date(today.getFullYear(),b.getMonth(),b.getDate()))a--;return a};
+const fmtDM=d=>d.getDate()+' de '+MESES[d.getMonth()];
+const siteUrl=()=>location.href.replace(/admin\.html.*$/,'index.html');
+const waBtn=(phone,text,label)=>`<a class="btn sm" href="${esc(DK.waUrl(phone,text))}" target="_blank" rel="noopener">${label||'WhatsApp'}</a>`;
+function renderExtra(){renderClientes();renderCumple();renderBalance();renderOfertas()}
+
+/* ---------- descarga en Excel (con respaldo CSV si no cargó la librería) ---------- */
+function download(name,sheets){
+  if(window.XLSX){
+    const wb=XLSX.utils.book_new();
+    sheets.forEach(sh=>{const ws=XLSX.utils.aoa_to_sheet(sh.rows);ws['!cols']=sh.rows[0].map((_,i)=>({wch:Math.min(46,Math.max(10,...sh.rows.map(r=>String(r[i]==null?'':r[i]).length)+2))}));XLSX.utils.book_append_sheet(wb,ws,sh.name.slice(0,31))});
+    XLSX.writeFile(wb,name+'.xlsx');return 'xlsx';
+  }
+  const csv='﻿'+sheets[0].rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=name+'.csv';document.body.appendChild(a);a.click();a.remove();
+  toast('No cargó la librería de Excel: se descargó la primera hoja en CSV (se abre en Excel).');return 'csv';
+}
+
+/* ---------- clientes ---------- */
+let CLI=[];
+function renderClientes(){
+  CLI=DK.buildClients(DB.res,DB.clientes);
+  const q=DK.normTxt($('#cSearch').value),qd=$('#cSearch').value.replace(/\D/g,'');
+  const rows=CLI.filter(c=>!q||DK.normTxt(c.apoderado+' '+c.nino).includes(q)||(qd&&String(c.celular).replace(/\D/g,'').includes(qd)));
+  $('#cliBody').innerHTML=rows.length?rows.map(c=>{
+    const last=c.eventos[c.eventos.length-1];
+    return `<tr><td><b>${esc(c.apoderado)}</b>${c.correo?`<br><span class="note">${esc(c.correo)}</span>`:''}</td><td>${esc(c.nino||'—')}</td><td>${c.nacimiento?fd(c.nacimiento)+`<br><span class="note">${ageOf(c.nacimiento)} años</span>`:'—'}</td><td>${esc(c.celular)}</td><td class="num">${c.eventos.length}${c.ultimo?`<br><span class="note">último ${fd(c.ultimo)}</span>`:''}</td><td>${last?esc(last.arrendo||'—'):'—'}</td><td class="num">${CLP(c.total)}</td>
+      <td style="white-space:nowrap">${waBtn(c.celular,'','WhatsApp')}${c.extraId!=null?` <button class="btn sm" data-kedit="${c.extraId}">Editar</button> <button class="btn sm" data-kdel="${c.extraId}">Eliminar</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8" class="muted">Aún no hay clientes. Se agregan solos con cada reserva, o puedes añadirlos abajo.</td></tr>';
+  $$('[data-kedit]').forEach(b=>b.onclick=()=>fillCli(DB.clientes.find(x=>String(x.id)===b.dataset.kedit)));
+  $$('[data-kdel]').forEach(b=>b.onclick=()=>{const c=DB.clientes.find(x=>String(x.id)===b.dataset.kdel);if(c&&confirm(`¿Eliminar a ${c.apoderado} (${c.nino}) de la cartera?`))doAct(()=>API.deleteCliente(c.id),'Cliente eliminado')});
+}
+$('#cSearch').addEventListener('input',renderClientes);
+function clearCli(){['kId','kApo','kNino','kNac','kCel','kMail','kArr','kFecha','kMonto','kNotas'].forEach(i=>$('#'+i).value='');$('#cFormT').textContent='Agregar cliente';$('#kCancel').hidden=true;$('#kErr').hidden=true}
+function fillCli(c){if(!c)return;$('#kId').value=c.id;$('#kApo').value=c.apoderado;$('#kNino').value=c.nino;$('#kNac').value=c.nacimiento||'';$('#kCel').value=c.celular;$('#kMail').value=c.correo||'';$('#kArr').value=c.arrendo||'';$('#kFecha').value=c.fecha||'';$('#kMonto').value=c.monto===''?'':c.monto;$('#kNotas').value=c.notas||'';$('#cFormT').textContent='Editar cliente';$('#kCancel').hidden=false;$('#cliForm').scrollIntoView({behavior:'smooth',block:'center'})}
+$('#kCancel').onclick=clearCli;
+$('#cliForm').addEventListener('submit',e=>{
+  e.preventDefault();const err=$('#kErr');err.hidden=true;
+  const c={id:$('#kId').value?(isNaN(+$('#kId').value)?$('#kId').value:+$('#kId').value):undefined,apoderado:$('#kApo').value.trim(),nino:$('#kNino').value.trim(),nacimiento:$('#kNac').value,celular:$('#kCel').value.trim(),correo:$('#kMail').value.trim(),arrendo:$('#kArr').value.trim(),fecha:$('#kFecha').value,monto:$('#kMonto').value===''?'':Math.round(+$('#kMonto').value),notas:$('#kNotas').value.trim()};
+  const bad=c.apoderado.length<3?'Escribe el nombre del apoderado.':c.nino.length<2?'Escribe el nombre del niño o niña.':c.celular.replace(/\D/g,'').length<8?'Escribe un celular de al menos 8 dígitos.':'';
+  if(bad){err.textContent=bad;err.hidden=false;return}
+  doAct(async()=>{await API.saveCliente(c);clearCli()},c.id?'Cliente actualizado':'Cliente agregado');
+});
+$('#xlsClientes').onclick=()=>{
+  const evs=[];CLI.forEach(c=>c.eventos.forEach(v=>evs.push([v.fecha?fd(v.fecha):'',v.fecha?MES(parseISO(v.fecha).getMonth()):'',c.apoderado,c.nino,c.celular,v.arrendo,v.total,v.estado,v.folio])));
+  evs.sort((a,b)=>String(a[0]).split('-').reverse().join('').localeCompare(String(b[0]).split('-').reverse().join('')));
+  const bd=CLI.filter(c=>c.nacimiento).map(c=>{const n=DK.nextBirthday(c.nacimiento);return [c.nino,c.apoderado,c.celular,fmtDM(n.date),n.age,n.days]}).sort((a,b)=>a[5]-b[5]);
+  download('Divertikids_clientes_'+iso(today),[
+   {name:'Clientes',rows:[['Apoderado','Niño/a','Nacimiento','Edad','Celular','Correo','Eventos','Último evento','Lo que arrendó (último)','Total pagado (CLP)'],...CLI.map(c=>{const l=c.eventos[c.eventos.length-1];return [c.apoderado,c.nino,c.nacimiento?fd(c.nacimiento):'',c.nacimiento?ageOf(c.nacimiento):'',c.celular,c.correo,c.eventos.length,c.ultimo?fd(c.ultimo):'',l?l.arrendo:'',c.total]})]},
+   {name:'Eventos',rows:[['Fecha','Mes','Apoderado','Niño/a','Celular','Lo que arrendó','Total (CLP)','Estado','Folio'],...evs]},
+   {name:'Cumpleaños',rows:[['Niño/a','Apoderado','Celular','Próximo cumpleaños','Edad que cumple','Días que faltan'],...bd]}]);
+};
+
+/* ---------- cumpleaños ---------- */
+const TPL_KEY='dk-msg-tpl';
+const TPL_DEF='Hola {apoderado} 👋 Somos Divertí Kids. Se acerca el cumpleaños de {nino} ({edad} años, el {fecha}) y nos encantaría ayudarte a celebrarlo otra vez. {ofertas}Mira precios, elige la fecha y arma la fiesta en 3D aquí: {sitio}';
+try{$('#msgTpl').value=localStorage.getItem(TPL_KEY)||TPL_DEF}catch(e){$('#msgTpl').value=TPL_DEF}
+$('#msgTpl').addEventListener('input',()=>{try{localStorage.setItem(TPL_KEY,$('#msgTpl').value)}catch(e){}renderCumple()});
+const activeOffers=()=>DB.ofertas.filter(DK.offerActive);
+function proposalText(c,n){
+  const of=activeOffers();const ofTxt=of.length?'Tenemos estas ofertas: '+of.map(o=>o.titulo+' ('+o.texto+')').join('; ')+'. ':'';
+  return ($('#msgTpl').value||TPL_DEF).replace(/\{apoderado\}/g,c.apoderado.split(' ')[0]).replace(/\{nino\}/g,c.nino).replace(/\{edad\}/g,n.age).replace(/\{fecha\}/g,fmtDM(n.date)).replace(/\{ofertas\}/g,ofTxt).replace(/\{sitio\}/g,siteUrl());
+}
+const propKey=(c,n)=>DK.phoneKey(c.celular)+'|'+DK.normTxt(c.nino)+'|'+n.year;
+function renderCumple(){
+  const withEv=CLI.filter(c=>c.nacimiento&&c.nino&&c.eventos.length);
+  // destacados: cumplen en los próximos 30 días o cumplieron hace menos de 15
+  const hl=[];
+  withEv.forEach(c=>{const n=DK.nextBirthday(c.nacimiento),l=DK.lastBirthday(c.nacimiento);
+    if(n.days<=30)hl.push({c,when:n.days,txt:n.days===0?'¡Cumple años hoy!':`Cumple ${n.age} años en ${n.days} día${n.days===1?'':'s'} (${fmtDM(n.date)})`,cls:n.days<=7?'soon':'near'});
+    else if(l.days<=14)hl.push({c,when:-l.days,txt:`Estuvo de cumpleaños hace ${l.days} día${l.days===1?'':'s'} (cumplió ${l.age})`,cls:'past'});
+  });
+  hl.sort((a,b)=>Math.abs(a.when)-Math.abs(b.when));
+  $('#cumpleHl').innerHTML=hl.length?hl.map(({c,txt,cls})=>{const l=c.eventos[c.eventos.length-1];return `<article class="hlcard ${cls}"><b>${esc(c.nino)}</b><span>${esc(txt)}</span><span class="note">Arrendó${l&&l.arrendo?': '+esc(l.arrendo):''}${l&&l.fecha?' · '+fd(l.fecha):''}</span><span class="note">Apoderado: ${esc(c.apoderado)}</span></article>`}).join(''):'<p class="muted">No hay cumpleaños cercanos entre los clientes que ya arrendaron.</p>';
+  const rows=withEv.map(c=>({c,n:DK.nextBirthday(c.nacimiento)})).filter(x=>x.n.days<=35).sort((a,b)=>a.n.days-b.n.days);
+  $('#propBody').innerHTML=rows.length?rows.map(({c,n})=>{const sent=DB.propuestas.includes(propKey(c,n));
+    return `<tr><td><b>${esc(c.nino)}</b></td><td>${fmtDM(n.date)}<br><span class="note">cumple ${n.age} · ${n.days===0?'hoy':'en '+n.days+' día'+(n.days===1?'':'s')}</span></td><td>${esc(c.apoderado)}</td><td>${esc(c.celular)}</td>
+     <td style="white-space:nowrap">${sent?'<span class="badge ok">Enviada</span>':`${waBtn(c.celular,proposalText(c,n),'Enviar por WhatsApp')} <button class="btn sm" data-sent="${esc(propKey(c,n))}">Marcar enviada</button>`}</td></tr>`}).join(''):'<tr><td colspan="5" class="muted">No hay propuestas por enviar este mes.</td></tr>';
+  $$('[data-sent]').forEach(b=>b.onclick=()=>doAct(()=>API.markProposal(b.dataset.sent),'Propuesta marcada como enviada'));
+}
+
+/* ---------- balance mensual ---------- */
+const BAL={year:today.getFullYear(),month:today.getMonth()};
+function balYears(){const ys=new Set([today.getFullYear()]);DB.res.forEach(r=>r.date&&ys.add(+r.date.slice(0,4)));DB.clientes.forEach(c=>c.fecha&&ys.add(+c.fecha.slice(0,4)));return [...ys].sort()}
+$('#balYear').onchange=()=>{BAL.year=+$('#balYear').value;renderBalance()};
+$('#balMonth').innerHTML=MESES.map((m,i)=>`<option value="${i}">${MES(i)}</option>`).join('');
+$('#balMonth').value=String(BAL.month);
+$('#balMonth').onchange=()=>{BAL.month=+$('#balMonth').value;renderBalance()};
+function eventsOf(year,month){
+  const out=[];
+  DB.res.filter(r=>r.status!=='cancelada'&&r.status!=='por_pagar'&&r.date).forEach(r=>{const d=parseISO(r.date);if(d.getFullYear()===year&&(month==null||d.getMonth()===month)){const it=Object.entries(r.items||{}).map(([k,q])=>(byId(k)?byId(k).name:k)+(q>1?' ×'+q:''));if(r.parcela)it.unshift('Parcela');out.push({fecha:r.date,cliente:r.client.name,nino:r.client.kid||'',arrendo:it.join(', '),total:r.total,estado:r.status})}});
+  DB.clientes.filter(c=>c.fecha).forEach(c=>{const d=parseISO(c.fecha);if(d.getFullYear()===year&&(month==null||d.getMonth()===month))out.push({fecha:c.fecha,cliente:c.apoderado,nino:c.nino,arrendo:c.arrendo||'',total:+c.monto||0,estado:'finalizada'})});
+  return out.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+}
+function renderBalance(){
+  const ys=balYears();if(!ys.includes(BAL.year))BAL.year=ys[ys.length-1];
+  $('#balYear').innerHTML=ys.map(y=>`<option ${y===BAL.year?'selected':''}>${y}</option>`).join('');
+  const rows=DK.monthlyBalance(DB.res,DB.clientes,BAL.year);
+  const T=rows.reduce((a,r)=>{['eventos','contratado','abonos','saldos','porCobrar','cobrado'].forEach(k=>a[k]+=r[k]);return a},{eventos:0,contratado:0,abonos:0,saldos:0,porCobrar:0,cobrado:0});
+  $('#balMetrics').innerHTML=`<div class="panel"><span class="eyebrow">Eventos del año</span><b>${T.eventos}</b></div><div class="panel"><span class="eyebrow">Contratado</span><b>${CLP(T.contratado)}</b></div><div class="panel"><span class="eyebrow">Cobrado</span><b>${CLP(T.cobrado)}</b></div><div class="panel"><span class="eyebrow">Por cobrar</span><b>${CLP(T.porCobrar)}</b></div>`;
+  $('#balBody').innerHTML=rows.map(r=>`<tr${r.m===today.getMonth()&&BAL.year===today.getFullYear()?' class="cur"':''}><td>${MES(r.m)}</td><td class="num">${r.eventos}</td><td class="num">${CLP(r.contratado)}</td><td class="num">${CLP(r.abonos)}</td><td class="num">${CLP(r.saldos)}</td><td class="num"><b>${CLP(r.cobrado)}</b></td><td class="num">${CLP(r.porCobrar)}</td></tr>`).join('')+`<tr class="tot"><td>Total ${BAL.year}</td><td class="num">${T.eventos}</td><td class="num">${CLP(T.contratado)}</td><td class="num">${CLP(T.abonos)}</td><td class="num">${CLP(T.saldos)}</td><td class="num"><b>${CLP(T.cobrado)}</b></td><td class="num">${CLP(T.porCobrar)}</td></tr>`;
+  const mx=Math.max(1,...rows.map(r=>r.contratado));
+  $('#balBars').innerHTML=rows.map(r=>`<div class="bcol" title="${MES(r.m)}: ${CLP(r.contratado)}"><div class="bar-c" style="height:${Math.round(r.contratado/mx*100)}%"><i style="height:${r.contratado?Math.round(r.cobrado/r.contratado*100):0}%"></i></div><span>${MES(r.m).slice(0,3)}</span></div>`).join('');
+  const ev=eventsOf(BAL.year,BAL.month);
+  $('#evBody').innerHTML=ev.length?ev.map(e=>`<tr><td>${fd(e.fecha)}</td><td>${esc(e.cliente)}</td><td>${esc(e.nino||'—')}</td><td>${esc(e.arrendo||'—')}</td><td class="num">${CLP(e.total)}</td><td>${esc(e.estado)}</td></tr>`).join(''):'<tr><td colspan="6" class="muted">No hay eventos ese mes.</td></tr>';
+}
+$('#xlsBalance').onclick=()=>{
+  const rows=DK.monthlyBalance(DB.res,DB.clientes,BAL.year);
+  const sum=k=>rows.reduce((a,r)=>a+r[k],0);
+  download('Divertikids_balance_'+BAL.year,[
+   {name:'Balance '+BAL.year,rows:[['Mes','Eventos','Contratado (CLP)','Abonos cobrados','Saldos cobrados','Total cobrado','Por cobrar'],...rows.map(r=>[MES(r.m),r.eventos,r.contratado,r.abonos,r.saldos,r.cobrado,r.porCobrar]),['Total',sum('eventos'),sum('contratado'),sum('abonos'),sum('saldos'),sum('cobrado'),sum('porCobrar')]]},
+   {name:'Eventos '+BAL.year,rows:[['Fecha','Mes','Cliente','Niño/a','Lo que arrendó','Total (CLP)','Estado'],...eventsOf(BAL.year).map(e=>[fd(e.fecha),MES(parseISO(e.fecha).getMonth()),e.cliente,e.nino,e.arrendo,e.total,e.estado])]}]);
+};
+
+/* ---------- ofertas ---------- */
+function clearOf(){['oId','oTit','oTxt','oHasta'].forEach(i=>$('#'+i).value='');$('#oAct').value='1';$('#oFormT').textContent='Nueva oferta';$('#oCancel').hidden=true;$('#oErr').hidden=true}
+$('#oCancel').onclick=clearOf;
+function renderOfertas(){
+  $('#ofList').innerHTML=DB.ofertas.length?DB.ofertas.map(o=>{const vig=DK.offerActive(o);return `<li style="align-items:flex-start"><span><b>${esc(o.titulo)}</b> ${vig?'<span class="badge ok">Visible</span>':'<span class="badge">Oculta o vencida</span>'}<br><span class="note">${esc(o.texto)}${o.hasta?' · hasta '+fd(o.hasta):''}</span></span><span style="white-space:nowrap"><button class="btn sm" data-oedit="${esc(o.id)}">Editar</button> <button class="btn sm" data-odel="${esc(o.id)}">Quitar</button></span></li>`}).join(''):'<li><span class="muted">Aún no hay ofertas publicadas.</span><span></span></li>';
+  $$('[data-oedit]').forEach(b=>b.onclick=()=>{const o=DB.ofertas.find(x=>String(x.id)===b.dataset.oedit);if(!o)return;$('#oId').value=o.id;$('#oTit').value=o.titulo;$('#oTxt').value=o.texto;$('#oHasta').value=o.hasta||'';$('#oAct').value=o.activa===false?'0':'1';$('#oFormT').textContent='Editar oferta';$('#oCancel').hidden=false;$('#ofForm').scrollIntoView({behavior:'smooth',block:'center'})});
+  $$('[data-odel]').forEach(b=>b.onclick=()=>{const o=DB.ofertas.find(x=>String(x.id)===b.dataset.odel);if(o&&confirm(`¿Quitar la oferta "${o.titulo}"?`))doAct(()=>API.deleteOferta(o.id),'Oferta eliminada')});
+}
+$('#ofForm').addEventListener('submit',e=>{
+  e.preventDefault();const err=$('#oErr');err.hidden=true;
+  const idv=$('#oId').value,o={id:idv?(isNaN(+idv)?idv:+idv):undefined,titulo:$('#oTit').value.trim(),texto:$('#oTxt').value.trim(),hasta:$('#oHasta').value,activa:$('#oAct').value==='1'};
+  if(o.titulo.length<3||o.texto.length<3){err.textContent='Escribe un título y el detalle de la oferta.';err.hidden=false;return}
+  doAct(async()=>{await API.saveOferta(o);clearOf()},o.id?'Oferta actualizada':'Oferta publicada');
+});
 
 /* ---------- arranque ---------- */
 if(API.mode==='demo'){$('#demoHint').hidden=false;$('#dUser').textContent=API.demoUser;$('#dPass').textContent=API.demoPass;$('#lMail').value=API.demoUser}

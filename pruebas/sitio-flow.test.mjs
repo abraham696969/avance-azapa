@@ -15,7 +15,7 @@ const save=F=>{localStorage.__F=JSON.stringify(F)};
 const mk=t=>{const o={t,a:'select',f:[],p:null};const b={maybeSingle:()=>{o.one=true;return b},select:()=>b,order:()=>b,gte:(c,v)=>{o.f.push(['gte',c,v]);return b},eq:(c,v)=>{o.f.push(['eq',c,v]);return b},
  upsert:p=>{o.a='upsert';o.p=p;return b},update:p=>{o.a='update';o.p=p;return b},insert:p=>{o.a='insert';o.p=p;return b},delete:()=>{o.a='delete';return b},
  then:(ok,ko)=>Promise.resolve(run(o)).then(ok,ko)};return b};
-function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha',terreno:'id'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked',terreno:'terr'}[o.t];F.terr=F.terr||[];
+function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha',terreno:'id',ofertas:'id',clientes_extra:'id',propuestas:'clave'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked',terreno:'terr',ofertas:'ofe',clientes_extra:'cli',propuestas:'pro'}[o.t];F.terr=F.terr||[];F.ofe=F.ofe||[];F.cli=F.cli||[];F.pro=F.pro||[];
  const match=r=>o.f.every(([k,c,v])=>k==='eq'?r[c]===v:true);
  if(o.a==='select'){data=F[tab].filter(r=>(o.t!=='catalogo'||F.session||r.activo));}
  if(o.a==='upsert'){const i=F[tab].findIndex(r=>r[key]===o.p[key]);i>=0?F[tab][i]=Object.assign(F[tab][i],o.p):F[tab].push(o.p)}
@@ -28,7 +28,7 @@ window.supabase={createClient:()=>({
   if(n==='disponibilidad')data=[];
   if(n==='es_admin')data=true;
   if(n==='crear_reserva'){const folio='R-1006';data={folio,codigo:'COD1',total:195000,abono:58500,estado:a.p_online?'por_pagar':'pendiente'};
-    F.res.push({folio,fecha:a.p_fecha,franja:a.p_franja,nombre:a.p_nombre,email:a.p_email,telefono:a.p_telefono,invitados:a.p_invitados,items:a.p_items,parcela:a.p_parcela,layout:a.p_layout,total:195000,abono:58500,metodo_pago:a.p_metodo,transaccion:'',estado:data.estado,nota:''})}
+    F.res.push({folio,fecha:a.p_fecha,franja:a.p_franja,nombre:a.p_nombre,email:a.p_email,telefono:a.p_telefono,invitados:a.p_invitados,items:a.p_items,parcela:a.p_parcela,layout:a.p_layout,total:195000,abono:58500,metodo_pago:a.p_metodo,transaccion:'',estado:data.estado,nota:'',nombre_nino:a.p_nino,nacimiento_nino:a.p_nacimiento})}
   if(n==='estado_reserva')data=F.status;
   save(F);return {data,error:null}},
  storage:{from:b=>({upload:async(p,file,o)=>{const F=load();(F.uploads=F.uploads||[]).push({bucket:b,path:p,type:o&&o.contentType,size:file.size});save(F);return {data:{path:p},error:null}},getPublicUrl:p=>({data:{publicUrl:'https://fake.supabase.co/storage/v1/object/public/'+b+'/'+p}})})},
@@ -49,13 +49,14 @@ const F = () => p.evaluate(() => JSON.parse(localStorage.__F));
 const setStatus = s => p.evaluate(v => { const F = JSON.parse(localStorage.__F); F.status = v; localStorage.__F = JSON.stringify(F); }, s);
 
 await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
-await p.click('[data-add="castillo"]'); await p.click('#payBtn'); await p.waitForTimeout(200);
+await p.click('[data-add="castillo"]'); await p.fill('#cKid','Sofía'); await p.fill('#cKidBirth','2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
 assert(!(await p.isVisible('#cardBlock'))); assert(await p.isVisible('#onlineNote')); ok('con pago en línea se ocultan los campos de tarjeta de prueba y se explica el pago en Flow');
 assert((await p.textContent('#payGo')).includes('Flow')); ok('el botón dice "Ir a pagar a Flow"');
 await p.click('#payGo'); await p.waitForURL(/sandbox\.flow\.cl/, { timeout: 5000 });
 assert.equal(flowVisit, 'https://sandbox.flow.cl/pay?token=T'); ok('el navegador es enviado a la dirección de pago que entregó la función de servidor');
 await p.goto(srv.url + '/index.html'); await p.waitForTimeout(500);
 const calls = (await F()).calls; const cr = calls.find(c => c.rpc === 'crear_reserva'), inv = calls.find(c => c.fn);
+assert.equal(cr.args.p_nino, 'Sofía'); assert.equal(cr.args.p_nacimiento, '2020-03-05'); assert.equal(cr.args.p_acepta, true);
 assert.equal(cr.args.p_online, true); assert.equal(cr.args.p_metodo, 'Flow'); ok('la reserva se crea "online" (queda por pagar y guarda el cupo)');
 assert.deepEqual(inv.body, { folio: 'R-1006', codigo: 'COD1' }); assert.equal(inv.fn, 'flow-crear-pago'); ok('a la función de pago solo se le envían folio y código (el monto lo pone el servidor)');
 
@@ -76,7 +77,7 @@ assert(await a.isVisible('#loginView')); assert(!(await a.isVisible('#demoHint')
 await a.fill('#lMail', 'jefa@divertikids.cl'); await a.fill('#lPass', 'xx'); await a.click('#lBtn'); await a.waitForTimeout(600);
 assert(await a.isVisible('#panelView')); assert((await a.textContent('#modeBadge')).includes('Base de datos')); ok('login contra la base y panel visible');
 assert(await a.locator('[data-st="R-1006"]').inputValue() === 'por_pagar'); ok('la reserva por pagar se ve con su estado');
-await a.selectOption('[data-st="R-1006"]', 'confirmada'); await a.waitForTimeout(400);
+await a.selectOption('[data-st="R-1006"]', 'confirmada'); await a.waitForTimeout(400); await a.click('[data-tab=catalogo]');
 assert((await a.evaluate(() => JSON.parse(localStorage.__F))).res.find(r => r.folio === 'R-1006').estado === 'confirmada'); ok('cambiar el estado se guarda en la base');
 await a.fill('#sName', 'Trampolín'); await a.selectOption('#sShape', 'box'); await a.fill('#sPrice', '25000'); await a.fill('#sStock', '2');
 await a.fill('#sW', '3'); await a.fill('#sD', '3'); await a.fill('#sH', '1.2'); await a.click('#sSave'); await a.waitForTimeout(500);

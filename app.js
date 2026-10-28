@@ -4,7 +4,7 @@ const {$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOT
 /* ---------- datos desde la base (o modo demo) ---------- */
 let data;
 try{data=await API.loadPublic()}
-catch(e){console.error(e);data={res:[],blocked:[],catalog:{}};setTimeout(()=>toast('No se pudo conectar con la base de datos. Revisa config.js.'),600)}
+catch(e){console.error(e);data={res:[],blocked:[],catalog:{},ofertas:[]};setTimeout(()=>toast('No se pudo conectar con la base de datos. Revisa config.js.'),600)}
 DK.applyCatalog(data.catalog);
 DK.applyTerrain(data.terrain||DK.DEFAULT_TERRAIN);
 const DB={res:data.res,blocked:data.blocked};
@@ -336,6 +336,10 @@ $('#clientForm').addEventListener('submit',e=>{
   e.preventDefault();const err=$('#formErr');err.hidden=true;
   const n=$('#cName').value.trim(),m=$('#cMail').value.trim(),t=$('#cPhone').value.trim(),g=+$('#cGuests').value;
   if(n.length<3||!/^\S+@\S+\.\S+$/.test(m)||t.replace(/\D/g,'').length<8||!(g>0)){err.textContent='Revisa tus datos: nombre, un correo válido, un teléfono de al menos 8 dígitos y la cantidad de invitados.';err.hidden=false;return}
+  const kid=$('#cKid').value.trim(),kb=$('#cKidBirth').value;
+  if(kid.length<2){err.textContent='Escribe el nombre del niño o niña cumpleañero/a.';err.hidden=false;return}
+  if(!kb||parseISO(kb)>today||parseISO(kb)<new Date(today.getFullYear()-25,today.getMonth(),today.getDate())){err.textContent='Indica la fecha de nacimiento del niño o niña (la usamos para saludarlo en su cumpleaños).';err.hidden=false;return}
+  if(!$('#cConsent').checked){err.textContent='Para reservar debes aceptar que guardemos los datos.';err.hidden=false;return}
   if(issues().length){return}
   $('#payAmt').textContent=CLP(quote().abono);$('#payMsg').hidden=true;$('#payGo').disabled=false;$('#payOv').hidden=false;$('#payGo').focus();
 });
@@ -351,7 +355,7 @@ $('#payGo').onclick=async()=>{
     if(num==='4000000000000002'){msg.style.color='var(--bad)';msg.textContent='Pago rechazado por el banco emisor. No se hizo ningún cargo. Prueba con otra tarjeta.';go.disabled=false;return}}
   if(issues().length){msg.style.color='var(--bad)';msg.textContent='Mientras pagabas cambió la disponibilidad. Revisa tu cotización.';go.disabled=false;return}
   const q=quote(),items={};q.lines.forEach(l=>{if(l.id!=='parcela')items[l.id]=l.qty});
-  const client={name:$('#cName').value.trim(),email:$('#cMail').value.trim(),phone:$('#cPhone').value.trim(),guests:+$('#cGuests').value};
+  const client={name:$('#cName').value.trim(),email:$('#cMail').value.trim(),phone:$('#cPhone').value.trim(),guests:+$('#cGuests').value,kid:$('#cKid').value.trim(),kidBirth:$('#cKidBirth').value,consent:$('#cConsent').checked};
   const method=online?'Flow':document.querySelector('input[name=pm]:checked').value,txn=online?'':'TBK-'+Math.floor(Math.random()*9e8+1e8);
   const layout=S.placed.map(p=>({id:p.id,x:p.x,z:p.z,rot:p.rot}));
   try{
@@ -505,6 +509,19 @@ if(THREE_OK){
   Object.assign(cam,{theta:0.5,phi:0.85,r:34*CAM_K});
 }
 renderTabs();refreshAll();render();
+
+/* ---------- redes, WhatsApp y ofertas ---------- */
+{
+  const N=window.DK_NEGOCIO||{};
+  $$('[data-social]').forEach(l=>{const u=N[l.dataset.social];if(u)l.href=u;else l.hidden=true});
+  const wa=DK.waUrl(N.whatsapp||'','Hola Divertí Kids, quiero consultar por una fiesta.');
+  $$('[data-wa]').forEach(l=>{if(N.whatsapp)l.href=wa;else l.hidden=true});
+  const offers=(data.ofertas||[]).filter(DK.offerActive);
+  if(offers.length){
+    $('#ofertas').hidden=false;$('#navOfertas').hidden=false;
+    $('#offers').innerHTML=offers.map(o=>`<article class="offer"><h3>${esc(o.titulo)}</h3><p>${esc(o.texto)}</p>${o.hasta?`<p class="note">Válida hasta el ${fmtDate(o.hasta)}</p>`:''}<a class="btn sm primary" data-wa href="${DK.waUrl(N.whatsapp||'','Hola, me interesa la oferta: '+o.titulo)}" target="_blank" rel="noopener">Consultar por WhatsApp</a></article>`).join('');
+  }
+}
 
 {const q=new URLSearchParams(location.search),f=q.get('folio'),c=q.get('c');
  if(f&&c){history.replaceState(null,'',location.pathname);showReturn(f,c)}}

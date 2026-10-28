@@ -10,7 +10,7 @@ await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
 const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const p = await ctx.newPage(); p.on('pageerror', e => errs.push('público: ' + e.message));
 await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
-await p.click('[data-add="castillo"]'); await p.click('#payBtn'); await p.waitForTimeout(200);
+await p.click('[data-add="castillo"]'); await p.fill('#cKid','Sofía'); await p.fill('#cKidBirth','2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
 assert(await p.isVisible('#payOv')); ok('se abre la ventana de pago');
 assert(await p.isVisible('#cardBlock')); ok('en modo demo se ven los campos de tarjeta de prueba');
 await p.click('#payGo'); await p.waitForTimeout(2200);
@@ -23,6 +23,7 @@ await a.fill('#lPass', 'mala'); await a.click('#lBtn'); await a.waitForTimeout(2
 assert((await a.textContent('#lErr')).includes('incorrectos')); ok('clave incorrecta se rechaza');
 await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(500);
 assert(await a.isVisible('#panelView')); assert((await a.textContent('#resBody')).includes('R-1006')); ok('entra y ve la reserva nueva');
+await a.click('[data-tab=catalogo]');
 
 // crear servicio
 await a.fill('#sName', 'Trampolín gigante'); await a.selectOption('#sCat', 'juegos'); await a.selectOption('#sShape', 'box');

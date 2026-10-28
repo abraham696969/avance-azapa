@@ -10,10 +10,13 @@ window.DK_CONFIG={
 };
 
 /* Datos del negocio que usa el chatbot. Lo que dejes vacío ("") el chatbot lo deriva a una persona.
-   IMPORTANTE: reemplaza los datos de contacto por los reales antes de publicar. */
+   Contacto y redes de Divertí Kids. */
 window.DK_NEGOCIO={
-  whatsapp:"56900000000",            // solo números, con código de país (ejemplo: 56912345678)
-  whatsappVisible:"+56 9 0000 0000", // cómo se muestra el número
+  whatsapp:"56962237619",            // solo números, con código de país (ejemplo: 56912345678)
+  whatsappVisible:"+56 9 6223 7619", // cómo se muestra el número
+  instagram:"https://www.instagram.com/diverti_.kids/",
+  facebook:"https://www.facebook.com/diverti.kids.714",
+  tiktok:"",                         // opcional: enlace de TikTok
   correo:"",                         // ej.: "contacto@divertikids.cl"
   direccion:"",                      // ej.: "Camino X, km 8, Valle de Azapa"
   atencion:"",                       // ej.: "Lunes a sábado de 9:00 a 19:00"

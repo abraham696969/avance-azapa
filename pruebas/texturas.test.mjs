@@ -7,7 +7,7 @@ const srv = await servir(root); const b = await chromium.launch({ executablePath
 const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
 const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const a = await ctx.newPage(); a.on('pageerror', e => errs.push(e.message)); a.on('dialog', d => d.accept());
-await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600);
+await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600); await a.click('[data-tab=catalogo]');
 await a.fill('#tW', '30'); await a.fill('#tD', '20'); await a.dispatchEvent('#tD', 'change');
 await a.selectOption('#eType', 'zona'); await a.click('#eAdd');
 assert.equal(await a.inputValue('#eTex'), 'pasto'); assert.equal(await a.inputValue('#eSolid'), '0'); ok('una "zona de suelo" nueva nace con pasto y como intangible');

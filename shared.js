@@ -161,7 +161,10 @@ const ok=r=>{if(r.error)throw new Error(r.error.message);return r.data};
 const DKEY='diverti-kids-demo-v2';
 function demoSeed(){
   const d=n=>iso(addDays(today,n));
-  const mk=(id,n,slot,name,items,st,layout)=>({id,date:d(n),slot,client:{name,email:'cliente@ejemplo.cl',phone:'+56 9 0000 0000',guests:20},items,parcela:true,status:st,example:true,layout,method:'Webpay Plus',txn:'TBK-DEMO'});
+  const KIDS=[['Sofía',6,25],['Mateo',8,-5],['Isidora',5,40],['Benjamín',7,12],['Emilia',9,200]]; // [niño, edad que cumple, días hasta su próximo cumpleaños]
+  const born=(age,days)=>{const t=addDays(today,days);return iso(new Date(t.getFullYear()-age,t.getMonth(),t.getDate()))};
+  let ki=0;
+  const mk=(id,n,slot,name,items,st,layout)=>{const k=KIDS[ki++%KIDS.length];return {id,date:d(n),slot,client:{name,email:'cliente@ejemplo.cl',phone:'+56 9 0000 000'+ki,guests:20,kid:k[0]+' (ejemplo)',kidBirth:born(k[1],k[2])},items,parcela:true,status:st,example:true,layout,method:'Webpay Plus',txn:'TBK-DEMO'}};
   const price=it=>Object.entries(it).reduce((a,[k,q])=>a+byId(k).price*q,byId('parcela').price);
   const R=[
    mk('R-1001',4,'tarde','Cliente de ejemplo 1',{castillo:1,papas:1},'confirmada',[{id:'castillo',x:-3,z:2,rot:0},{id:'papas',x:6,z:-3,rot:0}]),
@@ -171,10 +174,88 @@ function demoSeed(){
    mk('R-1005',20,'manana','Cliente de ejemplo 5',{castillo:2,pingpong:1},'pendiente',[{id:'castillo',x:-4,z:0,rot:0},{id:'castillo',x:4,z:0,rot:0},{id:'pingpong',x:0,z:6,rot:0}])
   ];
   R.forEach(r=>{r.total=price(r.items);r.abono=Math.round(r.total*.3)});
-  return {res:R,blocked:[{date:d(11),why:'Mantención de la parcela'}],catalog:{},seq:1006};
+  return {res:R,blocked:[{date:d(11),why:'Mantención de la parcela'}],catalog:{},seq:1006,clientes:[],ofertas:[{id:1,titulo:'Oferta de ejemplo: piscina de regalo',texto:'Arrienda un castillo inflable y la piscina chica va con 50 % de descuento. Edítala o bórrala desde el panel.',hasta:'',activa:true}],propuestas:[]};
 }
 function demoLoad(){try{const s=localStorage.getItem(DKEY);if(s){const o=JSON.parse(s);if(o&&o.res)return o}}catch(e){}return demoSeed()}
 function demoSave(s){try{localStorage.setItem(DKEY,JSON.stringify(s))}catch(e){}}
+
+
+/* ============ Cartera de clientes, cumpleaños y balance (funciones puras) ============ */
+const offerFromRow=x=>({id:x.id,titulo:x.titulo,texto:x.texto,hasta:x.hasta||'',activa:x.activa!==false});
+const offerActive=o=>o.activa!==false&&(!o.hasta||o.hasta>=iso(today));
+const clienteFromRow=x=>({id:x.id,apoderado:x.apoderado,nino:x.nino,nacimiento:x.nacimiento||'',celular:x.celular,correo:x.correo||'',arrendo:x.arrendo||'',fecha:x.fecha_evento||'',monto:x.monto==null?'':x.monto,notas:x.notas||''});
+const clienteRow=c=>({apoderado:c.apoderado,nino:c.nino,nacimiento:c.nacimiento||null,celular:c.celular,correo:c.correo||null,arrendo:c.arrendo||null,fecha_evento:c.fecha||null,monto:c.monto===''||c.monto==null?null:Math.round(+c.monto),notas:c.notas||null});
+const normTxt=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s*\(ejemplo\)\s*/g,' ').replace(/[^a-z0-9]+/g,' ').trim();
+const phoneKey=p=>String(p||'').replace(/\D/g,'').slice(-9);
+/* Número para wa.me: deja 569XXXXXXXX (Chile) cuando se puede */
+function waPhone(p){
+  const d=String(p||'').replace(/\D/g,'');
+  if(d.startsWith('56')&&d.length>=11)return d;
+  if(d.length===9&&d.startsWith('9'))return '56'+d;
+  if(d.length===8)return '569'+d;
+  return d;
+}
+const waUrl=(phone,text)=>'https://wa.me/'+waPhone(phone)+(text?'?text='+encodeURIComponent(text):'');
+/* Une las reservas del sitio y los clientes agregados a mano en una sola cartera.
+   Un cliente = mismo celular y mismo niño. Las reservas canceladas o sin pagar no cuentan. */
+function buildClients(res,extras){
+  const map=new Map();
+  const upsert=(key,base)=>{let c=map.get(key);if(!c){c=Object.assign({key,eventos:[],total:0},base);map.set(key,c)}return c};
+  (res||[]).filter(r=>r.status!=='cancelada'&&r.status!=='por_pagar').forEach(r=>{
+    const cl=r.client||{},kid=cl.kid||'';
+    const c=upsert(phoneKey(cl.phone)+'|'+normTxt(kid),{apoderado:cl.name||'',nino:kid,nacimiento:cl.kidBirth||'',celular:cl.phone||'',correo:cl.email||'',origen:'sitio'});
+    if(!c.nacimiento&&cl.kidBirth)c.nacimiento=cl.kidBirth;
+    const names=Object.entries(r.items||{}).map(([k,q])=>(byId(k)?byId(k).name:k)+(q>1?' ×'+q:''));
+    if(r.parcela)names.unshift('Parcela');
+    c.eventos.push({fecha:r.date,arrendo:names.join(', '),total:r.total||0,estado:r.status,folio:r.id});
+    c.total+=(r.status==='confirmada'||r.status==='finalizada'?r.abono||0:0)+(r.status==='finalizada'?(r.total||0)-(r.abono||0):0);
+  });
+  (extras||[]).forEach(x=>{
+    const c=upsert(phoneKey(x.celular)+'|'+normTxt(x.nino),{apoderado:x.apoderado,nino:x.nino,nacimiento:x.nacimiento||'',celular:x.celular,correo:x.correo||'',origen:'manual',extraId:x.id,notas:x.notas||''});
+    if(!c.nacimiento&&x.nacimiento)c.nacimiento=x.nacimiento;
+    c.extraId=x.id;
+    if(x.fecha||x.arrendo||x.monto!=='')c.eventos.push({fecha:x.fecha||'',arrendo:x.arrendo||'',total:+x.monto||0,estado:'finalizada',folio:'manual'});
+    c.total+=+x.monto||0;c.notas=x.notas||c.notas||'';
+  });
+  const list=[...map.values()];
+  list.forEach(c=>{c.eventos.sort((a,b)=>a.fecha.localeCompare(b.fecha));c.ultimo=c.eventos.length?c.eventos[c.eventos.length-1].fecha:''});
+  return list.sort((a,b)=>a.apoderado.localeCompare(b.apoderado,'es'));
+}
+/* Próximo cumpleaños desde una fecha (por defecto hoy): fecha, días que faltan y edad que cumple */
+function nextBirthday(nac,from){
+  if(!nac)return null;from=from||today;
+  const b=parseISO(nac);if(isNaN(b))return null;
+  const mk=y=>{const m=b.getMonth(),d=b.getDate();const x=new Date(y,m,d);if(x.getMonth()!==m)return new Date(y,m,d-1);return x}; // 29 de febrero
+  let y=from.getFullYear(),n=mk(y);
+  if(n<from){y++;n=mk(y)}
+  return {date:n,days:Math.round((n-from)/864e5),age:y-b.getFullYear(),year:y};
+}
+/* Último cumpleaños ya pasado (para "estuvo de cumpleaños") */
+function lastBirthday(nac,from){
+  if(!nac)return null;from=from||today;const b=parseISO(nac);if(isNaN(b))return null;
+  const mk=y=>{const x=new Date(y,b.getMonth(),b.getDate());return x.getMonth()!==b.getMonth()?new Date(y,b.getMonth(),b.getDate()-1):x};
+  let y=from.getFullYear(),n=mk(y);if(n>from){y--;n=mk(y)}
+  return {date:n,days:Math.round((from-n)/864e5),age:y-b.getFullYear()};
+}
+/* Balance por mes (según la fecha del evento).
+   confirmada = abono cobrado · finalizada = evento hecho y saldo cobrado · pendiente = aún sin validar */
+function monthlyBalance(res,extras,year){
+  const rows=Array.from({length:12},(_,m)=>({m,eventos:0,contratado:0,abonos:0,saldos:0,porCobrar:0,pendientes:0}));
+  (res||[]).forEach(r=>{
+    if(r.status==='cancelada'||r.status==='por_pagar'||!r.date)return;
+    const d=parseISO(r.date);if(d.getFullYear()!==year)return;const row=rows[d.getMonth()];
+    row.eventos++;row.contratado+=r.total||0;
+    if(r.status==='pendiente'){row.pendientes+=r.abono||0;row.porCobrar+=(r.total||0)-(r.abono||0);return}
+    row.abonos+=r.abono||0;
+    if(r.status==='finalizada')row.saldos+=(r.total||0)-(r.abono||0);else row.porCobrar+=(r.total||0)-(r.abono||0);
+  });
+  (extras||[]).forEach(x=>{
+    if(!x.fecha||x.monto===''||x.monto==null)return;const d=parseISO(x.fecha);if(d.getFullYear()!==year)return;
+    const row=rows[d.getMonth()];row.eventos++;row.contratado+=+x.monto||0;row.abonos+=+x.monto||0;
+  });
+  rows.forEach(r=>{r.cobrado=r.abonos+r.saldos});
+  return rows;
+}
 
 const SLOT_OK=Object.keys(SLOTS);
 const API={
@@ -192,21 +273,23 @@ const API={
         c.from('catalogo').select('*')
       ]).then(r=>r.map(ok));
       const terrain=await c.from('terreno').select('*').eq('id',1).maybeSingle().then(r=>r.error?null:terrainFromRow(r.data),()=>null);  // si la tabla aún no existe, se usa el terreno de ejemplo
+      const ofertas=await c.from('ofertas').select('*').then(r=>r.error?[]:(r.data||[]).map(offerFromRow),()=>[]);   // si la tabla aún no existe, no hay ofertas
       return {
-        terrain,
+        terrain,ofertas,
         res:(d||[]).map(x=>({date:x.fecha,slot:x.franja,items:x.items||{},parcela:!!x.parcela,status:'activa'})),
         blocked:(b||[]).map(x=>({date:x.fecha,why:x.motivo||''})),
         catalog:Object.fromEntries((k||[]).map(x=>[x.item_id,fromRow(x)]))
       };
     }
     const s=demoLoad();
-    return {terrain:s.terrain||null,res:s.res.map(r=>({date:r.date,slot:r.slot,items:r.items,parcela:r.parcela,status:r.status})),blocked:s.blocked,catalog:s.catalog||{}};
+    return {terrain:s.terrain||null,ofertas:(s.ofertas||[]).filter(offerActive),res:s.res.map(r=>({date:r.date,slot:r.slot,items:r.items,parcela:r.parcela,status:r.status})),blocked:s.blocked,catalog:s.catalog||{}};
   },
   async createReservation(p){
     if(LIVE){
       const r=ok(await sb().rpc('crear_reserva',{
         p_fecha:p.date,p_franja:p.slot,p_nombre:p.client.name,p_email:p.client.email,p_telefono:p.client.phone,
-        p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn,p_online:!!p.online}));
+        p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn,p_online:!!p.online,
+        p_nino:p.client.kid,p_nacimiento:p.client.kidBirth,p_acepta:!!p.client.consent}));
       return r;
     }
     const s=demoLoad();
@@ -271,14 +354,19 @@ const API={
         c.from('catalogo').select('*')
       ]).then(x=>x.map(ok));
       const terrain=await c.from('terreno').select('*').eq('id',1).maybeSingle().then(r=>r.error?null:terrainFromRow(r.data),()=>null);
+      const soft=(q,fn)=>q.then(r=>r.error?[]:(r.data||[]).map(fn),()=>[]);   // tablas nuevas: si aún no existen, se muestran vacías
+      const [clientes,ofertas,props]=await Promise.all([
+        soft(c.from('clientes_extra').select('*').order('id'),clienteFromRow),
+        soft(c.from('ofertas').select('*').order('id'),offerFromRow),
+        soft(c.from('propuestas').select('clave'),x=>x.clave)]);
       return {
-        terrain,
-        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||''})),
+        terrain,clientes,ofertas,propuestas:props,
+        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||''})),
         blocked:b.map(x=>({date:x.fecha,why:x.motivo||''})),
         catalog:Object.fromEntries(k.map(x=>[x.item_id,fromRow(x)]))
       };
     }
-    const s=demoLoad();return {terrain:s.terrain||null,res:s.res,blocked:s.blocked,catalog:s.catalog||{}};
+    const s=demoLoad();return {terrain:s.terrain||null,res:s.res,blocked:s.blocked,catalog:s.catalog||{},clientes:s.clientes||[],ofertas:s.ofertas||[],propuestas:s.propuestas||[]};
   },
   async setStatus(folio,status){
     if(LIVE){ok(await sb().from('reservas').update({estado:status}).eq('folio',folio));return}
@@ -320,6 +408,33 @@ const API={
     if(up.error)throw new Error(up.error.message);
     return st.getPublicUrl(path).data.publicUrl;
   },
+  /* ---------- cartera, ofertas y propuestas ---------- */
+  async saveCliente(c){
+    if(LIVE){const row=clienteRow(c);if(c.id)ok(await sb().from('clientes_extra').update(row).eq('id',c.id));else ok(await sb().from('clientes_extra').insert(row));return}
+    const s=demoLoad();s.clientes=s.clientes||[];
+    if(c.id){const i=s.clientes.findIndex(x=>x.id===c.id);if(i>=0)s.clientes[i]=Object.assign({},c)}
+    else s.clientes.push(Object.assign({},c,{id:Date.now()}));
+    demoSave(s);
+  },
+  async deleteCliente(id){
+    if(LIVE){ok(await sb().from('clientes_extra').delete().eq('id',id));return}
+    const s=demoLoad();s.clientes=(s.clientes||[]).filter(x=>x.id!==id);demoSave(s);
+  },
+  async saveOferta(o){
+    if(LIVE){const row={titulo:o.titulo,texto:o.texto,hasta:o.hasta||null,activa:o.activa!==false};if(o.id)ok(await sb().from('ofertas').update(row).eq('id',o.id));else ok(await sb().from('ofertas').insert(row));return}
+    const s=demoLoad();s.ofertas=s.ofertas||[];
+    if(o.id){const i=s.ofertas.findIndex(x=>x.id===o.id);if(i>=0)s.ofertas[i]=Object.assign({},o)}
+    else s.ofertas.push(Object.assign({},o,{id:Date.now()}));
+    demoSave(s);
+  },
+  async deleteOferta(id){
+    if(LIVE){ok(await sb().from('ofertas').delete().eq('id',id));return}
+    const s=demoLoad();s.ofertas=(s.ofertas||[]).filter(x=>x.id!==id);demoSave(s);
+  },
+  async markProposal(clave){
+    if(LIVE){ok(await sb().from('propuestas').upsert({clave},{onConflict:'clave'}));return}
+    const s=demoLoad();s.propuestas=s.propuestas||[];if(!s.propuestas.includes(clave))s.propuestas.push(clave);demoSave(s);
+  },
   /* "eliminar" = ocultar del sitio; las reservas antiguas siguen mostrando su servicio */
   async deleteService(id){
     if(LIVE){ok(await sb().from('catalogo').update({activo:false}).eq('item_id',id));return}
@@ -329,5 +444,5 @@ const API={
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
 })();
