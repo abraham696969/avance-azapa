@@ -21,7 +21,7 @@
 <header class="top"><div class="wrap">
   <a class="logo" href="#inicio" aria-label="Divertí Kids Arica, inicio"><img class="logo-img" src="logo-sm.png" srcset="logo-sm.png 1x, logo.png 3x" width="56" height="56" alt="Divertí Kids Arica"></a>
   <nav class="main" aria-label="Principal">
-    <a href="#servicios">Servicios</a><a href="#ofertas" id="navOfertas" hidden>Ofertas</a><a href="#fecha">Fecha</a><a href="#simulador">Simulador 3D</a><a href="#reservar">Reservar</a>
+    <a href="#servicios">Servicios</a><a href="#ofertas" id="navOfertas" hidden>Ofertas</a><a href="#fecha">Fecha</a><a href="#simulador" id="navSim">Simulador 3D</a><a href="#reservar">Reservar</a>
   </nav>
   <span class="social" aria-label="Redes sociales y contacto">
     <a data-social="instagram" href="#" target="_blank" rel="noopener" aria-label="Instagram de Divertí Kids" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
@@ -51,6 +51,15 @@
       <li><b>5</b><span>Paga el abono<small>Recibes la confirmación por correo</small></span></li>
     </ol>
   </div>
+
+  <section id="modo">
+    <div class="sec-head"><p class="eyebrow">Modalidad</p><h2>¿Dónde será la fiesta?</h2>
+      <p>Puedes celebrar en nuestra parcela o llevamos los juegos y servicios a tu casa o local.</p></div>
+    <div class="modos">
+      <button type="button" class="modo" data-modo="parcela" aria-pressed="true"><b>En nuestra parcela</b><span>Piscina, quincho, canchas y espacio para todos. Reserva y arma tu distribución en el simulador 3D.</span></button>
+      <button type="button" class="modo" data-modo="domicilio" aria-pressed="false"><b>En tu casa o local</b><span>Llevamos, montamos y retiramos los juegos y servicios donde tú digas. Nos cuentas el suelo y las medidas del lugar.</span></button>
+    </div>
+  </section>
 
   <section id="servicios">
     <div class="sec-head"><p class="eyebrow">Catálogo</p><h2>Todo lo que arrendamos</h2>
@@ -119,7 +128,7 @@
 
   <section id="reservar">
     <div class="sec-head"><p class="eyebrow">Cotización y pago</p><h2>Confirma tu reserva</h2>
-      <p>La cotización sale de lo que ubicaste en el terreno. El abono del 30% confirma la fecha.</p></div>
+      <p id="bookNote">La cotización sale de lo que ubicaste en el terreno. El abono del 30% confirma la fecha.</p></div>
     <div class="book" id="bookArea">
       <div class="panel">
         <h3>Tu cotización</h3>
@@ -128,10 +137,39 @@
         <div class="total"><span style="font-weight:700">Total</span><span class="price num" id="qtotal"></span></div>
         <div class="abono"><span><b>Abono para confirmar (30%)</b><br><span class="note">El saldo se paga el día del evento.</span></span><span class="price num" id="qabono"></span></div>
         <div class="issues" id="issues"></div>
+        <div class="warns" id="siteWarns" hidden></div>
       </div>
       <div class="panel">
         <h3>Tus datos</h3>
         <form class="f" id="clientForm" novalidate style="margin-top:12px">
+          <fieldset class="lugar" id="lugarFs" hidden>
+            <legend>Datos del lugar (servicio a domicilio)</legend>
+            <p class="note">Con esto revisamos si los juegos caben y cómo montarlos. Mide el espacio libre donde irían los juegos.</p>
+            <div class="field"><label for="lZona">Zona de despacho</label><select id="lZona"></select></div>
+            <div class="two">
+              <div class="field"><label for="lTipo">Tipo de lugar</label><select id="lTipo"></select></div>
+              <div class="field"><label for="lSuelo">Tipo de suelo</label><select id="lSuelo"></select></div>
+            </div>
+            <div class="field"><label for="lDir">Dirección completa</label><input id="lDir" autocomplete="street-address" maxlength="120" placeholder="Calle, número, población o condominio"></div>
+            <div class="field"><label for="lRef">Referencia para llegar (opcional)</label><input id="lRef" maxlength="120" placeholder="Ej.: casa de reja verde, frente a la plaza"></div>
+            <div class="two">
+              <div class="field"><label for="lAncho">Ancho del espacio (m)</label><input id="lAncho" type="number" min="1" max="200" step="0.1" inputmode="decimal"></div>
+              <div class="field"><label for="lLargo">Largo del espacio (m)</label><input id="lLargo" type="number" min="1" max="200" step="0.1" inputmode="decimal"></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="lAlto">Altura libre (m, opcional)</label><input id="lAlto" type="number" min="1" max="30" step="0.1" inputmode="decimal" placeholder="Techo, ramas o cables"></div>
+              <div class="field"><label for="lAcceso">Ancho del acceso más angosto (cm, opcional)</label><input id="lAcceso" type="number" min="30" max="500" step="5" inputmode="numeric" placeholder="Puerta, portón o pasillo"></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="lNivel">Dónde se montan</label><select id="lNivel"><option value="planta">Planta baja o patio</option><option value="escaleras">Piso alto con escaleras</option><option value="ascensor">Piso alto con ascensor</option></select></div>
+              <div class="field"><label for="lPend">Terreno</label><select id="lPend"><option value="plano">Plano</option><option value="inclinado">Con pendiente</option></select></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="lLuz">¿Hay enchufe de 220 V cerca?</label><select id="lLuz"><option value="">Elige…</option><option value="si">Sí</option><option value="no">No</option></select></div>
+              <div class="field"><label for="lAgua">¿Hay agua cerca?</label><select id="lAgua"><option value="">Elige…</option><option value="si">Sí</option><option value="no">No</option></select></div>
+            </div>
+            <div class="field"><label for="lObs">Otros detalles (opcional)</label><textarea id="lObs" rows="2" maxlength="400" placeholder="Mascotas, horario de acceso, árboles, cables, estacionamiento…"></textarea></div>
+          </fieldset>
           <div class="field"><label for="cName">Nombre</label><input id="cName" autocomplete="name" value="Camila Rojas (ejemplo)"></div>
           <div class="two">
             <div class="field"><label for="cMail">Correo</label><input id="cMail" type="email" autocomplete="email" value="camila@ejemplo.cl"></div>

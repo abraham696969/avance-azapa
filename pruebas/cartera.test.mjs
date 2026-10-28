@@ -37,7 +37,7 @@ const a = await ctx.newPage(); a.on('pageerror', e => errs.push('admin: ' + e.me
 await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500);
 await a.fill('#lPass', 'admin1234'); await a.click('#lBtn'); await a.waitForTimeout(600);
 const tabs = await a.locator('#aTabs button').allTextContents();
-assert.deepEqual(tabs, ['Reservas', 'Clientes', 'Cumpleaños', 'Balance', 'Ofertas', 'Servicios y terreno']); ok('el panel tiene seis pestañas');
+assert.deepEqual(tabs, ['Reservas', 'Clientes', 'Cumpleaños', 'Balance', 'Ofertas', 'Domicilio', 'Servicios y terreno']); ok('el panel tiene siete pestañas');
 assert(await a.isVisible('#resBody') && !(await a.isVisible('#cliBody'))); await a.click('[data-tab=clientes]'); assert(await a.isVisible('#cliBody') && !(await a.isVisible('#resBody'))); ok('cada pestaña muestra solo su contenido');
 let cli = await a.textContent('#cliBody');
 assert(cli.includes('Camila Rojas') && cli.includes('Valentina') && cli.includes('01-12-2020')); ok('la reserva nueva entra sola a la cartera con apoderado, niño, nacimiento y celular');

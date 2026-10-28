@@ -156,6 +156,17 @@ El panel tiene seis pestañas:
 
 **Redes y WhatsApp:** se configuran en `config.js` (`instagram`, `facebook`, `tiktok` y `whatsapp`). Si dejas uno vacío, su ícono se oculta.
 
+## Arriendo a domicilio (juegos y servicios en la casa del cliente)
+
+El sitio ofrece dos modalidades: **En nuestra parcela** (con simulador 3D) y **En tu casa o local**. En domicilio el cliente elige servicios con cantidades, la zona de despacho y llena los datos del lugar: tipo de lugar, tipo de suelo, ancho × largo, altura libre, acceso, piso, terreno plano o con pendiente, enchufe de 220 V, agua y observaciones.
+
+1. **Actualiza la base de datos**: vuelve a pegar `schema.sql` completo en el SQL Editor de Supabase y ejecútalo (es seguro repetirlo).
+2. **Zonas y precios de despacho**: panel admin → pestaña **Domicilio**. Los precios iniciales (Arica urbana, Azapa, Lluta) son **ejemplos**: cámbialos por tus tarifas reales. El servidor calcula el flete; el cliente no puede alterarlo.
+3. **Servicios solo de parcela**: en la pestaña *Servicios y terreno*, desmarca "Disponible a domicilio" en lo que no se pueda llevar (piscina, quincho, etc.).
+4. **Bloqueos por tipo**: al bloquear una fecha elige si aplica a todo, solo parcela o solo domicilio.
+5. **Stock compartido**: las unidades de un juego se comparten entre parcela y domicilio el mismo día. Un pedido a domicilio no ocupa la parcela.
+6. **Alertas**: el sitio avisa si los servicios no caben en el espacio indicado, si falta enchufe, si hay pendiente o acceso angosto. Solo impide reservar cuando físicamente no caben; el resto son avisos para que tú confirmes con el cliente. Los datos del lugar se ven en cada reserva y en la pestaña Domicilio.
+
 ## Fotos y modelos 3D reales de los servicios
 
 En `admin.html` > **Agregar servicio** (o *Editar*) hay dos campos nuevos:
@@ -209,6 +220,7 @@ node pruebas/sitio-flow.test.mjs                             # recorrido con pag
 node pruebas/terreno.test.mjs                                # editor del terreno, guardado y uso en el sitio
 node pruebas/parcela-diverti.test.mjs                        # botón "Cargar mi parcela"
 node pruebas/texturas.test.mjs                               # texturas y sólido/intangible
+node pruebas/domicilio.test.mjs                              # modalidad domicilio, lugar, zonas y flete
 node pruebas/cartera.test.mjs                                # clientes, cumpleaños, balance, Excel, ofertas y redes
 node pruebas/terreno-3d.test.mjs                             # qué se dibuja en el 3D según el terreno (con 3D simulado)
 ```

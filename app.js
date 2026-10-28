@@ -9,13 +9,16 @@ DK.applyCatalog(data.catalog);
 DK.applyTerrain(data.terrain||DK.DEFAULT_TERRAIN);
 const DB={res:data.res,blocked:data.blocked};
 
-const S={cat:'todos',month:new Date(today.getFullYear(),today.getMonth(),1),date:null,slot:'tarde',parcela:true,placed:[],sel:null,uid:1};
+const S={modo:'parcela',qty:{},zona:'',cat:'todos',month:new Date(today.getFullYear(),today.getMonth(),1),date:null,slot:'tarde',parcela:true,placed:[],sel:null,uid:1};
 
 /* ---------- disponibilidad ---------- */
-const blockedDay=ds=>DB.blocked.some(b=>b.date===ds);
+const blockedDay=ds=>DB.blocked.some(b=>b.date===ds&&(!b.aplica||b.aplica==='todo'||b.aplica===S.modo));
+const ZONAS=(data.zonas&&data.zonas.length?data.zonas:[]);
+const domOK=it=>it.id!=='parcela'&&it.domicilio!==false;
+const dsgn=()=>S.modo==='domicilio'?DESIGN.filter(domOK):DESIGN;   // servicios que se pueden pedir en la modalidad actual
 function used(id,ds,slot){let n=0;DB.res.forEach(r=>{if(r.date===ds&&r.slot===slot&&r.status!=='cancelada'){if(id==='parcela'){if(r.parcela)n++}else n+=r.items[id]||0}});return n}
 function avail(id,ds,slot){if(blockedDay(ds))return 0;return Math.max(0,byId(id).stock-used(id,ds,slot))}
-function slotFree(ds,slot){return avail('parcela',ds,slot)>0}
+function slotFree(ds,slot){if(S.modo==='domicilio')return !blockedDay(ds)&&DESIGN.some(it=>domOK(it)&&avail(it.id,ds,slot)>0);return avail('parcela',ds,slot)>0}
 function dayState(ds){if(blockedDay(ds))return 'blocked';const f=Object.keys(SLOTS).filter(s=>slotFree(ds,s)).length;return f===0?'full':(f===2?'free':'partial')}
 (function pickDefault(){for(let i=7;i<60;i++){const d=addDays(today,i);if(d.getDay()===6&&dayState(iso(d))==='free'){S.date=iso(d);S.month=new Date(d.getFullYear(),d.getMonth(),1);return}}S.date=iso(addDays(today,8))})();
 
@@ -30,10 +33,10 @@ function renderTabs(){
   const t=$('#tabs');t.innerHTML='';
   [['todos','Todo'],...Object.entries(CATS)].forEach(([k,n])=>{const b=document.createElement('button');b.className='tab';b.textContent=n;b.setAttribute('aria-pressed',S.cat===k);b.onclick=()=>{S.cat=k;renderTabs();renderCatalog()};t.appendChild(b)});
 }
-const countOf=id=>S.placed.filter(p=>p.id===id).length;
+const countOf=id=>S.modo==='domicilio'?(S.qty[id]||0):S.placed.filter(p=>p.id===id).length;
 function renderCatalog(){
   const g=$('#catalog');g.innerHTML='';
-  CAT.filter(i=>S.cat==='todos'||i.cat===S.cat).forEach(it=>{
+  CAT.filter(i=>(S.cat==='todos'||i.cat===S.cat)&&(S.modo!=='domicilio'||domOK(i))).forEach(it=>{
     const el=document.createElement('article');el.className='card';
     const left=avail(it.id,S.date,S.slot);
     const inDesign=it.id==='parcela'?(S.parcela?1:0):countOf(it.id);
@@ -41,10 +44,12 @@ function renderCatalog(){
     el.innerHTML=`<div class="plan${it.img?' has-img':''}">${planSVG(it)}${it.img?`<img src="${esc(it.img)}" alt="${esc(it.name)}" loading="lazy" decoding="async" onerror="this.remove()">`:''}<small>${it.w} × ${it.d} m</small></div>
       <div class="body"><h3>${esc(it.name)}</h3><p>${esc(it.desc)}</p>
       <div class="row"><span class="price num">${CLP(it.price)}<small> / evento</small></span>${stockB}</div>
-      <div class="row"><span class="note">${inDesign?'En tu diseño: '+inDesign:'No está en tu diseño'}</span>
-      <button class="btn sm primary" data-add="${it.id}" ${left===0?'disabled':''}>${it.id==='parcela'?(S.parcela?'Quitar':'Agregar'):'Agregar al terreno'}</button></div></div>`;
+      <div class="row"><span class="note">${S.modo==='domicilio'?(inDesign?'En tu pedido: '+inDesign:'No está en tu pedido'):(inDesign?'En tu diseño: '+inDesign:'No está en tu diseño')}</span>
+      ${S.modo==='domicilio'?`<span class="qty"><button class="qtybtn" data-dm="${it.id}" aria-label="Quitar ${esc(it.name)}" ${inDesign?'':'disabled'}>−</button><b class="num">${inDesign}</b><button class="qtybtn" data-dp="${it.id}" aria-label="Agregar ${esc(it.name)}" ${inDesign>=left?'disabled':''}>+</button></span>`:`<button class="btn sm primary" data-add="${it.id}" ${left===0?'disabled':''}>${it.id==='parcela'?(S.parcela?'Quitar':'Agregar'):'Agregar al terreno'}</button>`}</div></div>`;
     g.appendChild(el);
   });
+  $$('[data-dp]').forEach(b=>b.onclick=()=>addDom(b.dataset.dp));
+  $$('[data-dm]').forEach(b=>b.onclick=()=>{const id=b.dataset.dm;if(S.qty[id]>0){S.qty[id]--;if(!S.qty[id])delete S.qty[id];refreshAll()}});
   $$('[data-add]').forEach(b=>b.onclick=()=>{const id=b.dataset.add;if(id==='parcela'){S.parcela=!S.parcela;refreshAll()}else{if(addItem(id)){toast('Agregado al terreno')}}});
 }
 
@@ -257,6 +262,7 @@ function addItem(id){
   const sp=findSpot(it);if(!sp){toast('No hay espacio libre en el terreno');return false}
   const uid=spawn(id,sp[0],sp[1],0);select(uid);refreshAll();return true;
 }
+function addDom(id){const it=byId(id);if((S.qty[id]||0)>=avail(id,S.date,S.slot)){toast('No quedan más "'+it.name+'" para esa fecha y franja');return false}S.qty[id]=(S.qty[id]||0)+1;refreshAll();return true}
 function removeUid(uid){const i=S.placed.findIndex(p=>p.uid===uid);if(i<0)return;scene&&scene.remove(S.placed[i].mesh);S.placed.splice(i,1);if(S.sel===uid)S.sel=null;refreshAll()}
 function select(uid){if(S.sel){const o=S.placed.find(p=>p.uid===S.sel);o&&setEmissive(o.mesh,0)}S.sel=uid;if(uid){const o=S.placed.find(p=>p.uid===uid);setEmissive(o.mesh,0x444422)}
   const o=S.placed.find(p=>p.uid===S.sel);$('#selName').textContent=o?byId(o.id).name:'Ninguno';['#rotL','#rotR','#delSel'].forEach(s=>$(s).disabled=!o);render()}
@@ -307,15 +313,20 @@ function renderPalette(){
 /* ---------- cotización ---------- */
 function quote(){
   const lines=[];
-  if(S.parcela){const p=byId('parcela');lines.push({id:'parcela',name:p.name,qty:1,unit:p.price,sub:p.price})}
-  DESIGN.forEach(it=>{const q=countOf(it.id);if(q)lines.push({id:it.id,name:it.name,qty:q,unit:it.price,sub:it.price*q})});
+  if(S.modo==='parcela'&&S.parcela){const p=byId('parcela');lines.push({id:'parcela',name:p.name,qty:1,unit:p.price,sub:p.price})}
+  dsgn().forEach(it=>{const q=countOf(it.id);if(q)lines.push({id:it.id,name:it.name,qty:q,unit:it.price,sub:it.price*q})});
+  if(S.modo==='domicilio'){const z=ZONAS.find(z=>z.id===S.zona);if(z&&lines.length)lines.push({id:'flete',name:'Despacho, montaje y retiro · '+z.nombre,qty:1,unit:z.precio,sub:z.precio})}
   const total=lines.reduce((a,l)=>a+l.sub,0);return {lines,total,abono:Math.round(total*.3)}
 }
 function issues(){
   const out=[];
-  if(!slotFree(S.date,S.slot))out.push('La parcela está ocupada en la franja elegida. Cambia de fecha o de franja.');
-  DESIGN.forEach(it=>{const q=countOf(it.id),l=avail(it.id,S.date,S.slot);if(q>l)out.push(`${it.name}: tienes ${q} y solo hay ${l} disponible${l===1?'':'s'} para esa fecha.`)});
-  if(!quote().lines.length)out.push('Tu cotización está vacía. Agrega servicios desde el catálogo o el simulador.');
+  if(!slotFree(S.date,S.slot))out.push(S.modo==='domicilio'?'Esa franja no tiene servicios disponibles. Cambia de fecha o de franja.':'La parcela está ocupada en la franja elegida. Cambia de fecha o de franja.');
+  dsgn().forEach(it=>{const q=countOf(it.id),l=avail(it.id,S.date,S.slot);if(q>l)out.push(`${it.name}: tienes ${q} y solo hay ${l} disponible${l===1?'':'s'} para esa fecha.`)});
+  if(!quote().lines.length)out.push(S.modo==='domicilio'?'Tu cotización está vacía. Agrega servicios desde el catálogo.':'Tu cotización está vacía. Agrega servicios desde el catálogo o el simulador.');
+  if(S.modo==='domicilio'){
+    if(!S.zona)out.push('Elige la zona de despacho para calcular el costo.');
+    const L=readLugar();if(+L.ancho>0&&+L.largo>0)DK.siteChecks(L,S.qty).issues.forEach(t=>out.push(t));
+  }
   return out;
 }
 function refreshCart(){
@@ -327,6 +338,7 @@ function refreshCart(){
   $('#qtotal').textContent=CLP(q.total);$('#qabono').textContent=CLP(q.abono);
   const is=issues();$('#issues').innerHTML=is.map(t=>`<p>${esc(t)}</p>`).join('');
   $('#payBtn').disabled=is.length>0;}
+  if($('#siteWarns')){const L=readLugar(),w=S.modo==='domicilio'?DK.siteChecks(L,S.qty).warns:[];$('#siteWarns').innerHTML=w.map(t=>`<p>${esc(t)}</p>`).join('');$('#siteWarns').hidden=!w.length}
   $('#hudInfo').textContent=`${S.placed.length} objeto${S.placed.length===1?'':'s'} en el terreno · ${CLP(q.total)}`;
 }
 
@@ -340,6 +352,8 @@ $('#clientForm').addEventListener('submit',e=>{
   if(kid.length<2){err.textContent='Escribe el nombre del niño o niña cumpleañero/a.';err.hidden=false;return}
   if(!kb||parseISO(kb)>today||parseISO(kb)<new Date(today.getFullYear()-25,today.getMonth(),today.getDate())){err.textContent='Indica la fecha de nacimiento del niño o niña (la usamos para saludarlo en su cumpleaños).';err.hidden=false;return}
   if(!$('#cConsent').checked){err.textContent='Para reservar debes aceptar que guardemos los datos.';err.hidden=false;return}
+  if(S.modo==='domicilio'){const L=readLugar(),bad=!S.zona?'Elige la zona de despacho.':String(L.direccion).trim().length<5?'Escribe la dirección completa donde se montarán los juegos.':!L.suelo?'Indica el tipo de suelo del lugar.':!(+L.ancho>=1&&+L.largo>=1)?'Indica el ancho y el largo del espacio disponible, en metros.':!L.luz?'Indica si hay un enchufe de 220 V cerca.':!L.agua?'Indica si hay agua cerca.':'';
+    if(bad){err.textContent=bad;err.hidden=false;return}}
   if(issues().length){return}
   $('#payAmt').textContent=CLP(quote().abono);$('#payMsg').hidden=true;$('#payGo').disabled=false;$('#payOv').hidden=false;$('#payGo').focus();
 });
@@ -354,19 +368,20 @@ $('#payGo').onclick=async()=>{
   else{msg.innerHTML='<span class="spin"></span> Procesando pago en el ambiente de pruebas…';await new Promise(r=>setTimeout(r,1400));
     if(num==='4000000000000002'){msg.style.color='var(--bad)';msg.textContent='Pago rechazado por el banco emisor. No se hizo ningún cargo. Prueba con otra tarjeta.';go.disabled=false;return}}
   if(issues().length){msg.style.color='var(--bad)';msg.textContent='Mientras pagabas cambió la disponibilidad. Revisa tu cotización.';go.disabled=false;return}
-  const q=quote(),items={};q.lines.forEach(l=>{if(l.id!=='parcela')items[l.id]=l.qty});
+  const q=quote(),items={};q.lines.forEach(l=>{if(l.id!=='parcela'&&l.id!=='flete')items[l.id]=l.qty});
   const client={name:$('#cName').value.trim(),email:$('#cMail').value.trim(),phone:$('#cPhone').value.trim(),guests:+$('#cGuests').value,kid:$('#cKid').value.trim(),kidBirth:$('#cKidBirth').value,consent:$('#cConsent').checked};
   const method=online?'Flow':document.querySelector('input[name=pm]:checked').value,txn=online?'':'TBK-'+Math.floor(Math.random()*9e8+1e8);
-  const layout=S.placed.map(p=>({id:p.id,x:p.x,z:p.z,rot:p.rot}));
+  const dom=S.modo==='domicilio',lugar=dom?readLugar():null;
+  const layout=dom?[]:S.placed.map(p=>({id:p.id,x:p.x,z:p.z,rot:p.rot}));
   try{
-    const res=await API.createReservation({date:S.date,slot:S.slot,client,items,parcela:S.parcela,layout,method,txn,online});
+    const res=await API.createReservation({date:S.date,slot:S.slot,client,items,parcela:dom?false:S.parcela,layout,method,txn,online,modalidad:S.modo,lugar,zona:dom?S.zona:''});
     if(online){
       // el cupo ya quedó guardado; ahora se lleva al cliente a pagar a Flow
       const url=await API.startPayment(res.folio,res.codigo);
       msg.innerHTML='<span class="spin"></span> Redirigiendo a Flow…';
       location.href=url;return;
     }
-    const r={id:res.folio,date:S.date,slot:S.slot,client,items,parcela:S.parcela,status:res.estado,total:res.total,abono:res.abono,method,txn,layout};
+    const r={id:res.folio,date:S.date,slot:S.slot,client,items,parcela:dom?false:S.parcela,modalidad:S.modo,lugar,status:res.estado,total:res.total,abono:res.abono,method,txn,layout};
     DB.res.push({date:r.date,slot:r.slot,items,parcela:r.parcela,status:r.status});
     lastRes=r;$('#payOv').hidden=true;showDone(r);refreshAll();
   }catch(e){
@@ -401,7 +416,7 @@ function showDone(r){
   $('#bookArea').innerHTML=`<div class="panel" style="grid-column:1/-1;display:grid;gap:16px;max-width:760px">
     <div style="display:flex;gap:16px;align-items:center"><div class="okmark">✓</div><div><h3>Reserva ${r.id} ${r.status==='confirmada'?'confirmada':'recibida'}</h3><p class="muted">Abono de ${CLP(r.abono)} recibido con ${esc(r.method)} (operación ${r.txn}, ambiente de pruebas).</p></div></div>
     ${r.status!=='confirmada'?'<p class="note" style="font-weight:600">Tu reserva queda pendiente hasta que el equipo valide el abono. Te avisaremos por correo.</p>':''}<p class="eyebrow">Vista previa del correo de confirmación (no se envía en esta demo)</p>
-    <div class="mail">Para: ${esc(r.client.email)}\nAsunto: Reserva ${r.id} confirmada, ${fmtDate(r.date)}\n\nHola ${esc(r.client.name)},\ntu fiesta quedó reservada para el ${fmtDate(r.date)}, franja ${SLOTS[r.slot].n.toLowerCase()} (${SLOTS[r.slot].h}).\n\n${r.parcela?'• Arriendo de la parcela\n':''}${esc(items)}\n\nTotal: ${CLP(r.total)}\nAbono pagado: ${CLP(r.abono)}\nSaldo para el día del evento: ${CLP(r.total-r.abono)}\n\nTu distribución 3D quedó guardada y el equipo la verá en su panel.</div>
+    <div class="mail">Para: ${esc(r.client.email)}\nAsunto: Reserva ${r.id} confirmada, ${fmtDate(r.date)}\n\nHola ${esc(r.client.name)},\ntu fiesta quedó reservada para el ${fmtDate(r.date)}, franja ${SLOTS[r.slot].n.toLowerCase()} (${SLOTS[r.slot].h}).\n\n${r.parcela?'• Arriendo de la parcela\n':''}${r.modalidad==='domicilio'&&r.lugar?'• Servicio a domicilio en '+esc(r.lugar.direccion)+' (despacho, montaje y retiro incluidos)\n':''}${esc(items)}\n\nTotal: ${CLP(r.total)}\nAbono pagado: ${CLP(r.abono)}\nSaldo para el día del evento: ${CLP(r.total-r.abono)}\n\n${r.modalidad==='domicilio'?'Los datos de tu lugar quedaron guardados: el equipo los revisará y te contactará si necesita confirmar algo.':'Tu distribución 3D quedó guardada y el equipo la verá en su panel.'}</div>
     <div class="cta-row" style="margin:0"><button class="btn primary" id="again">Hacer otra reserva</button></div></div>`;
   $('#again').onclick=()=>location.reload();
   document.getElementById('reservar').scrollIntoView({behavior:'smooth'});
@@ -433,6 +448,7 @@ function availAnswer(dt){
 function itemsIn(q){return DESIGN.filter(i=>norm(i.name).split(/\s+/).some(w=>w.length>3&&!['maquina','mesa','chica','grande','azucar'].includes(w)&&q.includes(w.replace(/s$/,''))))}
 // Cada intención: [id, expresión sobre el texto sin tildes, respuesta]. El orden importa: lo más específico va primero.
 const FAQ=[
+ ['domicilio',/(domicilio|a mi casa|en mi casa|fuera de la parcela|despacho|flete|delivery|llevan (los )?juegos|llevar (los )?juegos)/,()=>`Sí, también arrendamos juegos y servicios <b>a domicilio</b>: los llevamos, montamos y retiramos en tu casa o local.${ZONAS.length?'<br>Despacho por zona: '+ZONAS.map(z=>`${esc(z.nombre)} <b>${CLP(z.precio)}</b>`).join(' · ')+'.':''}<br>Elige <a href="#modo">"En tu casa o local"</a>, cuéntanos el suelo y las medidas del espacio, y revisamos si caben.`],
  ['cancelacion',/(cancel|devol|reembols|cambiar (la )?fecha|cambio de fecha|modificar|reprogram|anular|arrepent)/,()=>cfgAns('cancelacion','Sobre cambios, cancelaciones y devoluciones:')],
  ['stock',/(cuantos|cuantas|que cantidad|unidades|hay mas|tienen mas|quedan)/,q=>{const it=itemsIn(q);if(!it.length)return null;return 'Unidades en total:<br>'+it.map(i=>`${esc(i.name)}: <b>${i.stock}</b>`).join('<br>')+'<br>Cuántas quedan libres depende de la fecha: dime el día (por ejemplo "25 de octubre") y lo reviso.'}],
  ['estado_reserva',/(mi reserva|estado de (mi|la) reserva|folio|ya pague|confirmaron|me llego|comprobante)/,()=>`Con tu folio (por ejemplo R-1006) una persona del equipo revisa el estado de tu reserva: puedes ${waLink}. Si pagaste en línea, al volver desde Flow ves la confirmación en la página.`],
@@ -481,11 +497,30 @@ $('#chatForm').addEventListener('submit',e=>{e.preventDefault();const v=$('#chat
 $('#chatFab').onclick=()=>{chatEl.hidden=false;$('#chatFab').hidden=true;if(!msgs.children.length)say('¡Hola! Soy el asistente de Divertí Kids. Pregúntame por precios, disponibilidad de una fecha, ubicación o cómo reservar.','bot');$('#chatIn').focus()};
 $('#chatX').onclick=()=>{chatEl.hidden=true;$('#chatFab').hidden=false};
 
+/* ---------- modalidad: parcela o domicilio ---------- */
+const LUGAR_IDS={tipo:'lTipo',direccion:'lDir',referencia:'lRef',suelo:'lSuelo',ancho:'lAncho',largo:'lLargo',alto:'lAlto',acceso:'lAcceso',nivel:'lNivel',luz:'lLuz',agua:'lAgua',pendiente:'lPend',obs:'lObs'};
+function readLugar(){const o={};Object.entries(LUGAR_IDS).forEach(([k,id])=>{const e=document.getElementById(id);o[k]=e?e.value:''});['ancho','largo','alto','acceso'].forEach(k=>{if(o[k]!=='')o[k]=+o[k]});return o}
+$('#lTipo').innerHTML=Object.entries(DK.TIPOS_LUGAR).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
+$('#lSuelo').innerHTML='<option value="">Elige…</option>'+Object.entries(DK.SUELOS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
+$('#lZona').innerHTML='<option value="">Elige tu zona…</option>'+ZONAS.map(z=>`<option value="${esc(z.id)}">${esc(z.nombre)} · ${CLP(z.precio)}</option>`).join('');
+$('#lZona').onchange=()=>{S.zona=$('#lZona').value;refreshCart()};
+Object.values(LUGAR_IDS).forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',refreshCart)});
+function setModo(m){
+  if(m==='domicilio'&&!ZONAS.length){toast('El servicio a domicilio aún no está habilitado. Escríbenos por WhatsApp.');return}
+  S.modo=m;const dom=m==='domicilio';
+  $$('[data-modo]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.modo===m));
+  $('#simulador').hidden=dom;$('#navSim').hidden=dom;$('#lugarFs').hidden=!dom;
+  $('#bookNote').textContent=dom?'La cotización sale de los servicios que elegiste más el despacho. El abono del 30% confirma la fecha.':'La cotización sale de lo que ubicaste en el terreno. El abono del 30% confirma la fecha.';
+  if(!slotFree(S.date,S.slot))S.slot=Object.keys(SLOTS).find(s=>slotFree(S.date,s))||S.slot;
+  refreshAll();
+}
+$$('[data-modo]').forEach(b=>b.onclick=()=>setModo(b.dataset.modo));
+$('#modo').hidden=!ZONAS.length;
 /* ---------- arranque ---------- */
 function refreshAll(){
   // si la fecha/franja cambió, se descuenta lo que ya no está disponible
   renderCal();renderSlots();renderCatalog();renderPalette();refreshCart();
-  const bad=DESIGN.filter(i=>countOf(i.id)>avail(i.id,S.date,S.slot));
+  const bad=dsgn().filter(i=>countOf(i.id)>avail(i.id,S.date,S.slot));
   $('#hudWarn').hidden=true;
   if(bad.length&&!lastRes)toast('Con esta fecha faltan: '+bad.map(i=>i.name).join(', ')+'. Revisa tu cotización.');
 }

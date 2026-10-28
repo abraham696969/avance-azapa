@@ -23,12 +23,16 @@ alter table public.catalogo add column if not exists color_tope text    check (c
 alter table public.catalogo add column if not exists forma      text    not null default 'box'
   check (forma in ('castle','slide','field','table','pingpong','machine','pool','box','land'));
 alter table public.catalogo add column if not exists activo     boolean not null default true;
+alter table public.catalogo add column if not exists domicilio  boolean not null default true;   -- ¿se arrienda también fuera de la parcela?
 alter table public.catalogo add column if not exists orden      integer not null default 100;
 
 create table if not exists public.fechas_bloqueadas (
   fecha  date primary key,
   motivo text
 );
+alter table public.fechas_bloqueadas add column if not exists aplica text not null default 'todo';   -- qué bloquea: todo, solo la parcela o solo el servicio a domicilio
+alter table public.fechas_bloqueadas drop constraint if exists fechas_bloqueadas_aplica_check;
+alter table public.fechas_bloqueadas add  constraint fechas_bloqueadas_aplica_check check (aplica in ('todo','parcela','domicilio'));
 
 create sequence if not exists public.folio_seq start 1001;
 
@@ -62,6 +66,13 @@ alter table public.reservas add column if not exists nota       text;
 alter table public.reservas add column if not exists nombre_nino      text;
 alter table public.reservas add column if not exists nacimiento_nino  date;
 alter table public.reservas add column if not exists acepta_datos     boolean not null default false;
+-- arriendo a domicilio (fuera de la parcela)
+alter table public.reservas add column if not exists modalidad text not null default 'parcela';
+alter table public.reservas drop constraint if exists reservas_modalidad_check;
+alter table public.reservas add  constraint reservas_modalidad_check check (modalidad in ('parcela','domicilio'));
+alter table public.reservas add column if not exists lugar  jsonb;                      -- datos del lugar: dirección, suelo, medidas, acceso, luz, agua...
+alter table public.reservas add column if not exists flete  integer not null default 0 check (flete >= 0);
+alter table public.reservas add column if not exists zona   text;
 
 -- estados: por_pagar (esperando el pago en Flow), pendiente (el equipo debe validar), confirmada, finalizada, cancelada
 alter table public.reservas drop constraint if exists reservas_estado_check;
@@ -119,17 +130,22 @@ $$;
 -- p_online = false -> queda "pendiente" y el equipo valida el abono a mano
 drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text);
 drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean);
+drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean);
 create or replace function public.crear_reserva(
   p_fecha date, p_franja text, p_nombre text, p_email text, p_telefono text,
   p_invitados integer, p_items jsonb, p_parcela boolean, p_layout jsonb,
   p_metodo text, p_transaccion text, p_online boolean default false,
-  p_nino text default null, p_nacimiento date default null, p_acepta boolean default false
+  p_nino text default null, p_nacimiento date default null, p_acepta boolean default false,
+  p_modalidad text default 'parcela', p_lugar jsonb default null, p_zona text default null
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v_total integer := 0; v_abono integer; v_folio text; v_codigo text; v_estado text;
   v_key text; v_qty integer; v_cat public.catalogo%rowtype; v_usado integer;
+  v_dom boolean := (coalesce(p_modalidad,'parcela') = 'domicilio'); v_flete integer := 0; v_parcela boolean;
 begin
+  if coalesce(p_modalidad,'parcela') not in ('parcela','domicilio') then raise exception 'Modalidad no válida.'; end if;
+  v_parcela := case when v_dom then false else coalesce(p_parcela, true) end;
   if p_franja not in ('manana','tarde') then raise exception 'Franja horaria no válida.'; end if;
   if p_fecha is null or p_fecha <= current_date then raise exception 'Elige una fecha futura.'; end if;
   if length(trim(coalesce(p_nombre,''))) < 3 then raise exception 'Escribe tu nombre.'; end if;
@@ -145,10 +161,21 @@ begin
   -- Evita dos reservas simultáneas para la misma fecha y franja
   perform pg_advisory_xact_lock(hashtext(p_fecha::text || p_franja));
 
-  if exists (select 1 from public.fechas_bloqueadas where fecha = p_fecha) then
+  if exists (select 1 from public.fechas_bloqueadas where fecha = p_fecha and aplica in ('todo', coalesce(p_modalidad,'parcela'))) then
     raise exception 'Esa fecha está bloqueada. Elige otra.';
   end if;
-  if exists (select 1 from public.reservas r where r.fecha = p_fecha and r.franja = p_franja
+  if v_dom then
+    -- datos del lugar: lo imprescindible para llegar y montar los juegos
+    if jsonb_typeof(coalesce(p_lugar,'null'::jsonb)) <> 'object' then raise exception 'Faltan los datos del lugar.'; end if;
+    if length(trim(coalesce(p_lugar ->> 'direccion',''))) < 5 then raise exception 'Escribe la dirección completa del lugar.'; end if;
+    if coalesce(p_lugar ->> 'suelo','') not in ('pasto','tierra','cemento','baldosa','arena','adoquin','otro') then raise exception 'Indica el tipo de suelo.'; end if;
+    if coalesce((p_lugar ->> 'ancho')::numeric, 0) not between 1 and 200 or coalesce((p_lugar ->> 'largo')::numeric, 0) not between 1 and 200 then
+      raise exception 'Indica las medidas del espacio (ancho y largo en metros).'; end if;
+    if length(coalesce(p_lugar::text,'')) > 3000 then raise exception 'Los datos del lugar son demasiado largos.'; end if;
+    select precio into v_flete from public.zonas_despacho where id = p_zona and activa;
+    if not found then raise exception 'Elige la zona de despacho.'; end if;
+  end if;
+  if not v_dom and exists (select 1 from public.reservas r where r.fecha = p_fecha and r.franja = p_franja
              and r.parcela and public.reserva_vigente(r.estado, r.expira)) then
     raise exception 'La parcela ya fue reservada en esa franja. Elige otra fecha o franja.';
   end if;
@@ -157,7 +184,7 @@ begin
     select key, (value)::text::integer from jsonb_each(coalesce(p_items,'{}'::jsonb))
   loop
     if v_qty is null or v_qty < 1 or v_key = 'parcela' then raise exception 'Servicios no válidos.'; end if;
-    select * into v_cat from public.catalogo where item_id = v_key and activo;
+    select * into v_cat from public.catalogo where item_id = v_key and activo and (not v_dom or domicilio);
     if not found then raise exception 'El servicio "%" ya no está disponible.', v_key; end if;
     select coalesce(sum((r.items ->> v_key)::integer), 0) into v_usado
       from public.reservas r
@@ -168,23 +195,26 @@ begin
     v_total := v_total + v_cat.precio * v_qty;
   end loop;
 
-  if coalesce(p_parcela, true) then
+  if v_parcela then
     select * into v_cat from public.catalogo where item_id = 'parcela';
     v_total := v_total + v_cat.precio;
   end if;
   if v_total <= 0 then raise exception 'Tu cotización está vacía.'; end if;
+  v_total := v_total + v_flete;
 
   v_abono  := round(v_total * 0.30);
   v_folio  := 'R-' || nextval('public.folio_seq');
   v_estado := case when coalesce(p_online,false) then 'por_pagar' else 'pendiente' end;
 
   insert into public.reservas (folio, fecha, franja, nombre, email, telefono, invitados, items, parcela, layout,
-                               total, abono, metodo_pago, transaccion, estado, expira, nombre_nino, nacimiento_nino, acepta_datos)
+                               total, abono, metodo_pago, transaccion, estado, expira, nombre_nino, nacimiento_nino, acepta_datos,
+                               modalidad, lugar, flete, zona)
   values (v_folio, p_fecha, p_franja, trim(p_nombre), trim(p_email), trim(p_telefono), p_invitados,
-          coalesce(p_items,'{}'::jsonb), coalesce(p_parcela,true), coalesce(p_layout,'[]'::jsonb),
+          coalesce(p_items,'{}'::jsonb), v_parcela, case when v_dom then '[]'::jsonb else coalesce(p_layout,'[]'::jsonb) end,
           v_total, v_abono, p_metodo, p_transaccion, v_estado,
           case when v_estado = 'por_pagar' then now() + interval '30 minutes' end,
-          trim(p_nino), p_nacimiento, true)
+          trim(p_nino), p_nacimiento, true,
+          coalesce(p_modalidad,'parcela'), case when v_dom then p_lugar end, v_flete, case when v_dom then p_zona end)
   returning codigo into v_codigo;
 
   return jsonb_build_object('folio', v_folio, 'codigo', v_codigo, 'total', v_total, 'abono', v_abono, 'estado', v_estado);
@@ -261,8 +291,8 @@ create policy "admin gestiona bloqueos" on public.fechas_bloqueadas
   for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 -- Permisos de ejecución de las funciones
-revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean) from public;
-grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean) to anon, authenticated;
+revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean,text,jsonb,text) from public;
+grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean,text,jsonb,text) to anon, authenticated;
 revoke all on function public.disponibilidad() from public;
 grant execute on function public.disponibilidad() to anon, authenticated;
 revoke all on function public.es_admin() from public;
@@ -379,4 +409,26 @@ create table if not exists public.propuestas (
 alter table public.propuestas enable row level security;
 drop policy if exists "admin gestiona propuestas" on public.propuestas;
 create policy "admin gestiona propuestas" on public.propuestas
+  for all to authenticated using (public.es_admin()) with check (public.es_admin());
+
+
+-- ---------- Arriendo a domicilio: zonas de despacho ----------
+create table if not exists public.zonas_despacho (
+  id      text primary key check (id ~ '^[a-z0-9-]{2,30}$'),
+  nombre  text not null check (length(nombre) between 3 and 60),
+  precio  integer not null check (precio >= 0),     -- despacho, montaje y retiro (CLP)
+  activa  boolean not null default true,
+  orden   integer not null default 100
+);
+-- Precios de EJEMPLO: ajústalos desde el panel (pestaña Domicilio) antes de publicar.
+insert into public.zonas_despacho (id, nombre, precio, orden) values
+  ('arica',  'Arica urbana',         10000, 10),
+  ('azapa',  'Valle de Azapa y alrededores', 15000, 20),
+  ('lluta',  'Valle de Lluta y Poconchile',  25000, 30)
+on conflict (id) do nothing;
+alter table public.zonas_despacho enable row level security;
+drop policy if exists "publico ve zonas activas" on public.zonas_despacho;
+create policy "publico ve zonas activas" on public.zonas_despacho for select to anon, authenticated using (activa);
+drop policy if exists "admin gestiona zonas" on public.zonas_despacho;
+create policy "admin gestiona zonas" on public.zonas_despacho
   for all to authenticated using (public.es_admin()) with check (public.es_admin());

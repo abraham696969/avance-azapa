@@ -1,7 +1,7 @@
 (async function(){
 'use strict';
 const {$,$$,CLP,esc,iso,parseISO,fmtDate,today,addDays,toast,SLOTS,CAT,CATS,SHAPES,byId,OBST,TERR,API,applyCatalog,numHex,MESES}=DK;
-let DB={res:[],blocked:[],catalog:{},clientes:[],ofertas:[],propuestas:[]};
+let DB={res:[],blocked:[],catalog:{},clientes:[],ofertas:[],propuestas:[],zonas:[]};
 const openDet=new Set();
 
 /* ---------- vistas ---------- */
@@ -48,6 +48,8 @@ const svgPlan=r=>{
   const bg=`<rect x="${-W/2}" y="${-D/2}" width="${W}" height="${D}" fill="${GR[TERR.ground]||GR.pasto}"/>`+(TERR.photo?`<image href="${esc(TERR.photo)}" x="${-W/2}" y="${-D/2}" width="${W}" height="${D}" preserveAspectRatio="none"/>`:'');
   return `<svg viewBox="${-W/2} ${-D/2} ${W} ${D}" role="img" aria-label="Distribución en planta">${bg}${OBST.map(obstSvg).join('')}${rects}<rect x="-2" y="${D/2-.4}" width="4" height=".4" fill="#25265E"/></svg>`;
 };
+const modTag=r=>r.modalidad==='domicilio'?'<span class="badge warn">Domicilio</span> ':'';
+const lugarHtml=r=>{const L=r.lugar||{};if(!L.direccion)return '';const z=DB.zonas.find(x=>x.id===r.zona);const chk=DK.siteChecks(L,r.items);return `<p><b>Lugar:</b> ${esc(DK.TIPOS_LUGAR[L.tipo]||L.tipo||'')} · ${esc(L.direccion)}${L.referencia?' ('+esc(L.referencia)+')':''}</p><ul style="margin:4px 0 0;padding-left:18px"><li>Suelo: ${esc(DK.SUELOS[L.suelo]||L.suelo)} · Espacio: ${DK.nf(L.ancho)} × ${DK.nf(L.largo)} m${L.alto?' · Altura libre: '+DK.nf(L.alto)+' m':''}${L.acceso?' · Acceso: '+L.acceso+' cm':''}</li><li>Enchufe 220 V: ${L.luz==='si'?'sí':'no'} · Agua: ${L.agua==='si'?'sí':'no'} · ${L.pendiente==='inclinado'?'Terreno con pendiente':'Terreno plano'} · ${L.nivel==='escaleras'?'Piso alto con escaleras':L.nivel==='ascensor'?'Piso alto con ascensor':'Planta baja o patio'}</li><li>Despacho: ${esc(z?z.nombre:r.zona||'—')} · ${CLP(r.flete||0)}</li>${L.obs?`<li>Detalles: ${esc(L.obs)}</li>`:''}</ul>${chk.issues.concat(chk.warns).map(t=>`<p class="note" style="color:var(--bad);font-weight:600">⚠ ${esc(t)}</p>`).join('')}`};
 function render(){
   const R=[...DB.res].sort((a,b)=>a.date.localeCompare(b.date)||a.slot.localeCompare(b.slot));
   const act=R.filter(r=>r.status!=='cancelada'&&r.status!=='por_pagar');
@@ -59,17 +61,17 @@ function render(){
   if(!R.length)tb.innerHTML='<tr><td colspan="7" class="muted">Aún no hay reservas.</td></tr>';
   R.forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td><b>${esc(r.id)}</b>${r.example?'<br><span class="note">ejemplo</span>':''}</td><td>${fmtDate(r.date).replace(/ de \d{4}$/,'')}<br><span class="note">${SLOTS[r.slot].n}</span></td><td>${esc(r.client.name)}<br><span class="note">${r.client.guests} invitados</span></td><td class="num">${CLP(r.total)}</td><td class="num">${CLP(r.abono)}</td>
+    tr.innerHTML=`<td>${modTag(r)}<b>${esc(r.id)}</b>${r.example?'<br><span class="note">ejemplo</span>':''}</td><td>${fmtDate(r.date).replace(/ de \d{4}$/,'')}<br><span class="note">${SLOTS[r.slot].n}</span></td><td>${esc(r.client.name)}<br><span class="note">${r.client.guests} invitados</span></td><td class="num">${CLP(r.total)}</td><td class="num">${CLP(r.abono)}</td>
     <td><select data-st="${esc(r.id)}" aria-label="Estado de ${esc(r.id)}">${['por_pagar','pendiente','confirmada','finalizada','cancelada'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select></td>
     <td><button class="btn sm" data-det="${esc(r.id)}">${openDet.has(r.id)?'Ocultar':'Ver distribución'}</button></td>`;
     tb.appendChild(tr);
-    if(openDet.has(r.id)){const d=document.createElement('tr');d.innerHTML=`<td colspan="7"><div class="detail"><div>${svgPlan(r)}</div><div><b>Servicios</b><ul style="margin:6px 0 0;padding-left:18px">${r.parcela?'<li>Arriendo de la parcela</li>':''}${Object.entries(r.items).map(([k,v])=>`<li>${esc(byId(k)?byId(k).name:k)} × ${v}</li>`).join('')}</ul><p class="note" style="margin-top:8px">${esc(r.client.email)} · ${esc(r.client.phone)}</p><p class="note">Pago: ${esc(r.method||'—')} · ${esc(r.txn||'—')}</p>${r.note?`<p class="note" style="color:var(--bad);font-weight:600">${esc(r.note)}</p>`:''}</div></div></td>`;tb.appendChild(d)}
+    if(openDet.has(r.id)){const d=document.createElement('tr');d.innerHTML=`<td colspan="7"><div class="detail"><div>${r.modalidad==='domicilio'?'<p class="note">Servicio a domicilio: no usa el simulador de la parcela.</p>':svgPlan(r)}</div><div><b>Servicios</b><ul style="margin:6px 0 0;padding-left:18px">${r.parcela?'<li>Arriendo de la parcela</li>':''}${Object.entries(r.items).map(([k,v])=>`<li>${esc(byId(k)?byId(k).name:k)} × ${v}</li>`).join('')}</ul>${r.modalidad==='domicilio'?lugarHtml(r):''}<p class="note" style="margin-top:8px">${esc(r.client.email)} · ${esc(r.client.phone)}</p><p class="note">Pago: ${esc(r.method||'—')} · ${esc(r.txn||'—')}</p>${r.note?`<p class="note" style="color:var(--bad);font-weight:600">${esc(r.note)}</p>`:''}</div></div></td>`;tb.appendChild(d)}
   });
   $$('[data-st]').forEach(s=>s.onchange=()=>doAct(()=>API.setStatus(s.dataset.st,s.value),'Estado actualizado'));
   $$('[data-det]').forEach(b=>b.onclick=()=>{const k=b.dataset.det;openDet.has(k)?openDet.delete(k):openDet.add(k);render()});
-  $('#blockList').innerHTML=DB.blocked.length?DB.blocked.map(b=>`<li><span>${fmtDate(b.date)}<br><span class="note">${esc(b.why)}</span></span><button class="btn sm" data-unb="${b.date}">Quitar</button></li>`).join(''):'<li><span class="muted">No hay fechas bloqueadas</span><span></span></li>';
+  $('#blockList').innerHTML=DB.blocked.length?DB.blocked.map(b=>`<li><span>${fmtDate(b.date)}<br><span class="note">${esc(b.why)} · ${b.aplica==='parcela'?'solo la parcela':b.aplica==='domicilio'?'solo domicilio':'todo'}</span></span><button class="btn sm" data-unb="${b.date}">Quitar</button></li>`).join(''):'<li><span class="muted">No hay fechas bloqueadas</span><span></span></li>';
   $$('[data-unb]').forEach(b=>b.onclick=()=>doAct(()=>API.removeBlock(b.dataset.unb),'Fecha desbloqueada'));
-  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td>${i.img?`<img class="thumb" src="${esc(i.img)}" alt="" loading="lazy"> `:''}<b>${esc(i.name)}</b>${i.model?' <span class="badge ok">3D real</span>':''}<br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
+  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td>${i.img?`<img class="thumb" src="${esc(i.img)}" alt="" loading="lazy"> `:''}<b>${esc(i.name)}</b>${i.model?' <span class="badge ok">3D real</span>':''}${i.domicilio===false&&i.id!=='parcela'?' <span class="badge">Solo parcela</span>':''}<br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
   const quick=id=>{const it=byId(id);const p=Math.max(0,Math.round(+document.querySelector(`[data-pr="${id}"]`).value||0)),k=Math.max(0,Math.round(+document.querySelector(`[data-sk="${id}"]`).value||0));doAct(()=>API.saveService(Object.assign({},it,{price:p,stock:k})),'Servicio actualizado')};
   $$('[data-pr]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.pr));
   $$('[data-sk]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.sk));
@@ -79,7 +81,7 @@ function render(){
 $('#blockForm').addEventListener('submit',e=>{e.preventDefault();const d=$('#bDate').value;
   if(!d||parseISO(d)<=today){toast('Elige una fecha futura');return}
   if(DB.blocked.some(b=>b.date===d)){toast('Esa fecha ya está bloqueada');return}
-  doAct(()=>API.addBlock(d,$('#bWhy').value.trim()||'Sin motivo'),'Fecha bloqueada')});
+  doAct(()=>API.addBlock(d,$('#bWhy').value.trim()||'Sin motivo',$('#bApl').value),'Fecha bloqueada')});
 $('#bDate').min=iso(addDays(today,1));
 
 /* ---------- formulario de servicios ---------- */
@@ -103,10 +105,10 @@ $('#sModel').addEventListener('change',e=>{
   pModel=f;showModel(true,f.name);
 });
 $('#sModelDel').onclick=()=>{pModel='quitar';$('#sModel').value='';showModel(false)};
-function clearForm(){pImg=null;pModel=null;curImg='';curModel='';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value='0';showImg('');showModel(false);['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
+function clearForm(){pImg=null;pModel=null;curImg='';curModel='';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value='0';showImg('');showModel(false);['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sDom').checked=true;$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
 function fillForm(it){
   $('#sId').value=it.id;$('#sName').value=it.name;$('#sDesc').value=it.desc||'';$('#sCat').value=it.cat;$('#sShape').value=it.shape==='land'?'castle':it.shape;
-  $('#sPrice').value=it.price;$('#sStock').value=it.stock;$('#sW').value=it.w;$('#sD').value=it.d;$('#sH').value=it.h;$('#sColor').value=numHex(it.color);
+  $('#sPrice').value=it.price;$('#sStock').value=it.stock;$('#sW').value=it.w;$('#sD').value=it.d;$('#sH').value=it.h;$('#sColor').value=numHex(it.color);$('#sDom').checked=it.domicilio!==false;
   pImg=null;pModel=null;curImg=it.img||'';curModel=it.model||'';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value=String(it.modelRot||0);showImg(curImg);showModel(!!curModel,'actual');
   $('#svcFormT').textContent='Editar: '+it.name;$('#sCancel').hidden=false;$('#sErr').hidden=true;
   $('#svcForm').scrollIntoView({behavior:'smooth',block:'center'});
@@ -122,6 +124,7 @@ $('#svcForm').addEventListener('submit',e=>{
   const old=byId(id)||{};
   const it=Object.assign({},old,{id,name,desc:$('#sDesc').value.trim(),cat:$('#sCat').value,shape:old.id==='parcela'?'land':$('#sShape').value,price,stock,w,d,h,color:parseInt($('#sColor').value.slice(1),16),top:old.top!=null?old.top:0xffffff,active:true});
   it.modelRot=+$('#sModelRot').value||0;
+  it.domicilio=it.id==='parcela'?false:$('#sDom').checked;
   doAct(async()=>{
     const sv=$('#sSave');sv.disabled=true;
     try{
@@ -239,7 +242,7 @@ const ageOf=nac=>{if(!nac)return '';const b=parseISO(nac);let a=today.getFullYea
 const fmtDM=d=>d.getDate()+' de '+MESES[d.getMonth()];
 const siteUrl=()=>location.href.replace(/admin\.html.*$/,'index.html');
 const waBtn=(phone,text,label)=>`<a class="btn sm" href="${esc(DK.waUrl(phone,text))}" target="_blank" rel="noopener">${label||'WhatsApp'}</a>`;
-function renderExtra(){renderClientes();renderCumple();renderBalance();renderOfertas()}
+function renderExtra(){renderClientes();renderCumple();renderBalance();renderOfertas();renderDomicilio()}
 
 /* ---------- descarga en Excel (con respaldo CSV si no cargó la librería) ---------- */
 function download(name,sheets){
@@ -278,12 +281,12 @@ $('#cliForm').addEventListener('submit',e=>{
   doAct(async()=>{await API.saveCliente(c);clearCli()},c.id?'Cliente actualizado':'Cliente agregado');
 });
 $('#xlsClientes').onclick=()=>{
-  const evs=[];CLI.forEach(c=>c.eventos.forEach(v=>evs.push([v.fecha?fd(v.fecha):'',v.fecha?MES(parseISO(v.fecha).getMonth()):'',c.apoderado,c.nino,c.celular,v.arrendo,v.total,v.estado,v.folio])));
+  const evs=[];CLI.forEach(c=>c.eventos.forEach(v=>evs.push([v.fecha?fd(v.fecha):'',v.fecha?MES(parseISO(v.fecha).getMonth()):'',c.apoderado,c.nino,c.celular,v.modalidad==='domicilio'?'Domicilio':'Parcela',v.direccion||'',v.arrendo,v.total,v.estado,v.folio])));
   evs.sort((a,b)=>String(a[0]).split('-').reverse().join('').localeCompare(String(b[0]).split('-').reverse().join('')));
   const bd=CLI.filter(c=>c.nacimiento).map(c=>{const n=DK.nextBirthday(c.nacimiento);return [c.nino,c.apoderado,c.celular,fmtDM(n.date),n.age,n.days]}).sort((a,b)=>a[5]-b[5]);
   download('Divertikids_clientes_'+iso(today),[
    {name:'Clientes',rows:[['Apoderado','Niño/a','Nacimiento','Edad','Celular','Correo','Eventos','Último evento','Lo que arrendó (último)','Total pagado (CLP)'],...CLI.map(c=>{const l=c.eventos[c.eventos.length-1];return [c.apoderado,c.nino,c.nacimiento?fd(c.nacimiento):'',c.nacimiento?ageOf(c.nacimiento):'',c.celular,c.correo,c.eventos.length,c.ultimo?fd(c.ultimo):'',l?l.arrendo:'',c.total]})]},
-   {name:'Eventos',rows:[['Fecha','Mes','Apoderado','Niño/a','Celular','Lo que arrendó','Total (CLP)','Estado','Folio'],...evs]},
+   {name:'Eventos',rows:[['Fecha','Mes','Apoderado','Niño/a','Celular','Modalidad','Dirección (domicilio)','Lo que arrendó','Total (CLP)','Estado','Folio'],...evs]},
    {name:'Cumpleaños',rows:[['Niño/a','Apoderado','Celular','Próximo cumpleaños','Edad que cumple','Días que faltan'],...bd]}]);
 };
 
@@ -324,8 +327,8 @@ $('#balMonth').value=String(BAL.month);
 $('#balMonth').onchange=()=>{BAL.month=+$('#balMonth').value;renderBalance()};
 function eventsOf(year,month){
   const out=[];
-  DB.res.filter(r=>r.status!=='cancelada'&&r.status!=='por_pagar'&&r.date).forEach(r=>{const d=parseISO(r.date);if(d.getFullYear()===year&&(month==null||d.getMonth()===month)){const it=Object.entries(r.items||{}).map(([k,q])=>(byId(k)?byId(k).name:k)+(q>1?' ×'+q:''));if(r.parcela)it.unshift('Parcela');out.push({fecha:r.date,cliente:r.client.name,nino:r.client.kid||'',arrendo:it.join(', '),total:r.total,estado:r.status})}});
-  DB.clientes.filter(c=>c.fecha).forEach(c=>{const d=parseISO(c.fecha);if(d.getFullYear()===year&&(month==null||d.getMonth()===month))out.push({fecha:c.fecha,cliente:c.apoderado,nino:c.nino,arrendo:c.arrendo||'',total:+c.monto||0,estado:'finalizada'})});
+  DB.res.filter(r=>r.status!=='cancelada'&&r.status!=='por_pagar'&&r.date).forEach(r=>{const d=parseISO(r.date);if(d.getFullYear()===year&&(month==null||d.getMonth()===month)){const it=Object.entries(r.items||{}).map(([k,q])=>(byId(k)?byId(k).name:k)+(q>1?' ×'+q:''));if(r.parcela)it.unshift('Parcela');else if(r.modalidad==='domicilio')it.unshift('A domicilio');out.push({fecha:r.date,cliente:r.client.name,nino:r.client.kid||'',modalidad:r.modalidad==='domicilio'?'Domicilio':'Parcela',arrendo:it.join(', '),total:r.total,estado:r.status})}});
+  DB.clientes.filter(c=>c.fecha).forEach(c=>{const d=parseISO(c.fecha);if(d.getFullYear()===year&&(month==null||d.getMonth()===month))out.push({fecha:c.fecha,cliente:c.apoderado,nino:c.nino,modalidad:'—',arrendo:c.arrendo||'',total:+c.monto||0,estado:'finalizada'})});
   return out.sort((a,b)=>a.fecha.localeCompare(b.fecha));
 }
 function renderBalance(){
@@ -338,14 +341,14 @@ function renderBalance(){
   const mx=Math.max(1,...rows.map(r=>r.contratado));
   $('#balBars').innerHTML=rows.map(r=>`<div class="bcol" title="${MES(r.m)}: ${CLP(r.contratado)}"><div class="bar-c" style="height:${Math.round(r.contratado/mx*100)}%"><i style="height:${r.contratado?Math.round(r.cobrado/r.contratado*100):0}%"></i></div><span>${MES(r.m).slice(0,3)}</span></div>`).join('');
   const ev=eventsOf(BAL.year,BAL.month);
-  $('#evBody').innerHTML=ev.length?ev.map(e=>`<tr><td>${fd(e.fecha)}</td><td>${esc(e.cliente)}</td><td>${esc(e.nino||'—')}</td><td>${esc(e.arrendo||'—')}</td><td class="num">${CLP(e.total)}</td><td>${esc(e.estado)}</td></tr>`).join(''):'<tr><td colspan="6" class="muted">No hay eventos ese mes.</td></tr>';
+  $('#evBody').innerHTML=ev.length?ev.map(e=>`<tr><td>${fd(e.fecha)}</td><td>${esc(e.cliente)}</td><td>${esc(e.nino||'—')}</td><td>${esc(e.modalidad)}</td><td>${esc(e.arrendo||'—')}</td><td class="num">${CLP(e.total)}</td><td>${esc(e.estado)}</td></tr>`).join(''):'<tr><td colspan="7" class="muted">No hay eventos ese mes.</td></tr>';
 }
 $('#xlsBalance').onclick=()=>{
   const rows=DK.monthlyBalance(DB.res,DB.clientes,BAL.year);
   const sum=k=>rows.reduce((a,r)=>a+r[k],0);
   download('Divertikids_balance_'+BAL.year,[
    {name:'Balance '+BAL.year,rows:[['Mes','Eventos','Contratado (CLP)','Abonos cobrados','Saldos cobrados','Total cobrado','Por cobrar'],...rows.map(r=>[MES(r.m),r.eventos,r.contratado,r.abonos,r.saldos,r.cobrado,r.porCobrar]),['Total',sum('eventos'),sum('contratado'),sum('abonos'),sum('saldos'),sum('cobrado'),sum('porCobrar')]]},
-   {name:'Eventos '+BAL.year,rows:[['Fecha','Mes','Cliente','Niño/a','Lo que arrendó','Total (CLP)','Estado'],...eventsOf(BAL.year).map(e=>[fd(e.fecha),MES(parseISO(e.fecha).getMonth()),e.cliente,e.nino,e.arrendo,e.total,e.estado])]}]);
+   {name:'Eventos '+BAL.year,rows:[['Fecha','Mes','Cliente','Niño/a','Modalidad','Lo que arrendó','Total (CLP)','Estado'],...eventsOf(BAL.year).map(e=>[fd(e.fecha),MES(parseISO(e.fecha).getMonth()),e.cliente,e.nino,e.modalidad,e.arrendo,e.total,e.estado])]}]);
 };
 
 /* ---------- ofertas ---------- */
@@ -361,6 +364,27 @@ $('#ofForm').addEventListener('submit',e=>{
   const idv=$('#oId').value,o={id:idv?(isNaN(+idv)?idv:+idv):undefined,titulo:$('#oTit').value.trim(),texto:$('#oTxt').value.trim(),hasta:$('#oHasta').value,activa:$('#oAct').value==='1'};
   if(o.titulo.length<3||o.texto.length<3){err.textContent='Escribe un título y el detalle de la oferta.';err.hidden=false;return}
   doAct(async()=>{await API.saveOferta(o);clearOf()},o.id?'Oferta actualizada':'Oferta publicada');
+});
+
+
+/* ---------- domicilio: zonas de despacho y pedidos ---------- */
+function clearZona(){['zId','zNom','zPrecio'].forEach(i=>$('#'+i).value='');$('#zAct').value='1';$('#zFormT').textContent='Nueva zona de despacho';$('#zCancel').hidden=true;$('#zErr').hidden=true}
+$('#zCancel').onclick=clearZona;
+function renderDomicilio(){
+  $('#zonaList').innerHTML=DB.zonas.length?DB.zonas.map(z=>`<li style="align-items:flex-start"><span><b>${esc(z.nombre)}</b> ${z.activa!==false?'<span class="badge ok">Activa</span>':'<span class="badge">Oculta</span>'}<br><span class="note">${CLP(z.precio)}</span></span><span style="white-space:nowrap"><button class="btn sm" data-zedit="${esc(z.id)}">Editar</button> <button class="btn sm" data-zdel="${esc(z.id)}">Quitar</button></span></li>`).join(''):'<li><span class="muted">No hay zonas: sin zonas el sitio no ofrece servicio a domicilio.</span><span></span></li>';
+  $$('[data-zedit]').forEach(b=>b.onclick=()=>{const z=DB.zonas.find(x=>x.id===b.dataset.zedit);if(!z)return;$('#zId').value=z.id;$('#zNom').value=z.nombre;$('#zPrecio').value=z.precio;$('#zAct').value=z.activa===false?'0':'1';$('#zFormT').textContent='Editar zona';$('#zCancel').hidden=false;$('#zonaForm').scrollIntoView({behavior:'smooth',block:'center'})});
+  $$('[data-zdel]').forEach(b=>b.onclick=()=>{const z=DB.zonas.find(x=>x.id===b.dataset.zdel);if(z&&confirm(`¿Quitar la zona "${z.nombre}"? Los pedidos anteriores no se alteran.`))doAct(()=>API.deleteZona(z.id),'Zona eliminada')});
+  const up=DB.res.filter(r=>r.modalidad==='domicilio'&&r.status!=='cancelada'&&r.status!=='por_pagar'&&r.date>=iso(today)).sort((a,b)=>a.date.localeCompare(b.date));
+  $('#domBody').innerHTML=up.length?up.map(r=>{const L=r.lugar||{},chk=DK.siteChecks(L,r.items),n=chk.issues.length+chk.warns.length;return `<tr><td>${fd(r.date)}<br><span class="note">${SLOTS[r.slot].n}</span></td><td>${esc(r.client.name)}<br><span class="note">${esc(r.client.phone)}</span></td><td>${esc(L.direccion||'—')}<br><span class="note">${esc(DK.SUELOS[L.suelo]||'')} · ${L.ancho?DK.nf(L.ancho)+' × '+DK.nf(L.largo)+' m':''}</span></td><td>${Object.entries(r.items).map(([k,q])=>esc(byId(k)?byId(k).name:k)+(q>1?' ×'+q:'')).join(', ')}</td><td>${n?`<span class="badge warn">${n} alerta${n>1?'s':''}</span><br><span class="note">${chk.issues.concat(chk.warns).map(esc).join('<br>')}</span>`:'<span class="badge ok">Sin alertas</span>'}</td></tr>`}).join(''):'<tr><td colspan="5" class="muted">No hay pedidos a domicilio próximos.</td></tr>';
+}
+$('#zonaForm').addEventListener('submit',e=>{
+  e.preventDefault();const err=$('#zErr');err.hidden=true;
+  const nombre=$('#zNom').value.trim(),precio=Math.round(+$('#zPrecio').value);let id=$('#zId').value;
+  if(nombre.length<3){err.textContent='Escribe el nombre de la zona.';err.hidden=false;return}
+  if(!($('#zPrecio').value!==''&&precio>=0)){err.textContent='Escribe el precio del despacho.';err.hidden=false;return}
+  if(!id)id=nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,26)+'-'+Math.random().toString(36).slice(2,4);
+  const old=DB.zonas.find(z=>z.id===id);
+  doAct(async()=>{await API.saveZona({id,nombre,precio,activa:$('#zAct').value==='1',orden:old&&old.orden||100+DB.zonas.length*10});clearZona()},old?'Zona actualizada':'Zona agregada');
 });
 
 /* ---------- arranque ---------- */

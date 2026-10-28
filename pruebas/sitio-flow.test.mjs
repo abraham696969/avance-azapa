@@ -15,7 +15,7 @@ const save=F=>{localStorage.__F=JSON.stringify(F)};
 const mk=t=>{const o={t,a:'select',f:[],p:null};const b={maybeSingle:()=>{o.one=true;return b},select:()=>b,order:()=>b,gte:(c,v)=>{o.f.push(['gte',c,v]);return b},eq:(c,v)=>{o.f.push(['eq',c,v]);return b},
  upsert:p=>{o.a='upsert';o.p=p;return b},update:p=>{o.a='update';o.p=p;return b},insert:p=>{o.a='insert';o.p=p;return b},delete:()=>{o.a='delete';return b},
  then:(ok,ko)=>Promise.resolve(run(o)).then(ok,ko)};return b};
-function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha',terreno:'id',ofertas:'id',clientes_extra:'id',propuestas:'clave'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked',terreno:'terr',ofertas:'ofe',clientes_extra:'cli',propuestas:'pro'}[o.t];F.terr=F.terr||[];F.ofe=F.ofe||[];F.cli=F.cli||[];F.pro=F.pro||[];
+function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha',terreno:'id',ofertas:'id',clientes_extra:'id',propuestas:'clave',zonas_despacho:'id'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked',terreno:'terr',ofertas:'ofe',clientes_extra:'cli',propuestas:'pro',zonas_despacho:'zon'}[o.t];F.terr=F.terr||[];F.ofe=F.ofe||[];F.cli=F.cli||[];F.pro=F.pro||[];F.zon=F.zon||[];
  const match=r=>o.f.every(([k,c,v])=>k==='eq'?r[c]===v:true);
  if(o.a==='select'){data=F[tab].filter(r=>(o.t!=='catalogo'||F.session||r.activo));}
  if(o.a==='upsert'){const i=F[tab].findIndex(r=>r[key]===o.p[key]);i>=0?F[tab][i]=Object.assign(F[tab][i],o.p):F[tab].push(o.p)}
@@ -56,6 +56,7 @@ await p.click('#payGo'); await p.waitForURL(/sandbox\.flow\.cl/, { timeout: 5000
 assert.equal(flowVisit, 'https://sandbox.flow.cl/pay?token=T'); ok('el navegador es enviado a la dirección de pago que entregó la función de servidor');
 await p.goto(srv.url + '/index.html'); await p.waitForTimeout(500);
 const calls = (await F()).calls; const cr = calls.find(c => c.rpc === 'crear_reserva'), inv = calls.find(c => c.fn);
+assert.equal(cr.args.p_modalidad, 'parcela'); assert.equal(cr.args.p_lugar, null);
 assert.equal(cr.args.p_nino, 'Sofía'); assert.equal(cr.args.p_nacimiento, '2020-03-05'); assert.equal(cr.args.p_acepta, true);
 assert.equal(cr.args.p_online, true); assert.equal(cr.args.p_metodo, 'Flow'); ok('la reserva se crea "online" (queda por pagar y guarda el cupo)');
 assert.deepEqual(inv.body, { folio: 'R-1006', codigo: 'COD1' }); assert.equal(inv.fn, 'flow-crear-pago'); ok('a la función de pago solo se le envían folio y código (el monto lo pone el servidor)');

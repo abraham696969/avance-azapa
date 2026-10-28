@@ -53,6 +53,7 @@
         <button type="button" data-tab="cumple">Cumpleaños</button>
         <button type="button" data-tab="balance">Balance</button>
         <button type="button" data-tab="ofertas">Ofertas</button>
+        <button type="button" data-tab="domicilio">Domicilio</button>
         <button type="button" data-tab="catalogo">Servicios y terreno</button>
       </nav>
 
@@ -65,6 +66,7 @@
           <form class="f" id="blockForm" style="margin-top:12px" novalidate>
             <div class="two"><div class="field"><label for="bDate">Fecha</label><input id="bDate" type="date"></div>
             <div class="field"><label for="bWhy">Motivo</label><input id="bWhy" value="Mantención de la parcela"></div></div>
+            <div class="field"><label for="bApl">Qué bloquea</label><select id="bApl"><option value="parcela">Solo la parcela (los servicios a domicilio siguen disponibles)</option><option value="domicilio">Solo el servicio a domicilio</option><option value="todo">Todo</option></select></div>
             <button class="btn" type="submit">Bloquear fecha</button>
           </form>
           <ul class="lines" id="blockList" style="margin-top:12px"></ul>
@@ -126,7 +128,7 @@
         </div>
         <div class="panel" style="margin-top:20px">
           <div class="bar"><div><h3>Eventos del mes</h3></div><div class="bar-r"><select id="balMonth" aria-label="Mes"></select></div></div>
-          <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Fecha</th><th>Cliente</th><th>Niño/a</th><th>Qué arrendó</th><th>Total</th><th>Estado</th></tr></thead><tbody id="evBody"></tbody></table></div>
+          <div class="tablewrap"><table style="min-width:640px"><thead><tr><th>Fecha</th><th>Cliente</th><th>Niño/a</th><th>Modalidad</th><th>Qué arrendó</th><th>Total</th><th>Estado</th></tr></thead><tbody id="evBody"></tbody></table></div>
         </div>
       </div>
 
@@ -149,6 +151,29 @@
         </div>
       </div>
 
+      <div class="tabpane" id="tab-domicilio" hidden>
+        <div class="adm2">
+          <div class="panel">
+            <h3 id="zFormT">Nueva zona de despacho</h3>
+            <p class="note" style="margin:4px 0 0">El precio de la zona se suma al pedido a domicilio e incluye llevar, montar y retirar los servicios. El cliente elige su zona al reservar.</p>
+            <form class="f" id="zonaForm" style="margin-top:12px" novalidate>
+              <input type="hidden" id="zId">
+              <div class="field"><label for="zNom">Nombre de la zona</label><input id="zNom" maxlength="60" placeholder="Ej.: Arica centro"></div>
+              <div class="two"><div class="field"><label for="zPrecio">Precio del despacho (CLP)</label><input id="zPrecio" type="number" min="0" step="500" inputmode="numeric"></div>
+                <div class="field"><label for="zAct">Estado</label><select id="zAct"><option value="1">Activa</option><option value="0">Oculta</option></select></div></div>
+              <p class="note" id="zErr" style="color:var(--bad);font-weight:600" role="alert" hidden></p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit">Guardar zona</button><button class="btn ghost" type="button" id="zCancel" hidden>Cancelar edición</button></div>
+            </form>
+          </div>
+          <div class="panel"><h3>Zonas de despacho</h3><p class="note" style="margin:4px 0 0">Los precios iniciales son de ejemplo: cámbialos por los tuyos.</p><ul class="lines" id="zonaList" style="margin-top:12px"></ul></div>
+        </div>
+        <div class="panel" style="margin-top:20px">
+          <h3>Pedidos a domicilio próximos</h3>
+          <p class="note" style="margin:4px 0 8px">Con los datos del lugar y las advertencias que el sitio detectó. Cambia el estado desde la pestaña Reservas.</p>
+          <div class="tablewrap"><table style="min-width:760px"><thead><tr><th>Fecha</th><th>Cliente</th><th>Dirección y lugar</th><th>Servicios</th><th>Alertas</th></tr></thead><tbody id="domBody"></tbody></table></div>
+        </div>
+      </div>
+
       <div class="tabpane" id="tab-catalogo" hidden>
       <div class="panel">
           <h3 id="svcFormT">Agregar servicio</h3>
@@ -159,6 +184,7 @@
               <div class="field"><label for="sCat">Categoría</label><select id="sCat"></select></div>
               <div class="field"><label for="sShape">Tipo en el simulador 3D</label><select id="sShape"></select></div>
             </div>
+            <label class="check" style="margin:2px 0 6px"><input type="checkbox" id="sDom" checked> <span>Se arrienda también a domicilio (fuera de la parcela)</span></label>
             <div class="field"><label for="sDesc">Descripción</label><input id="sDesc" maxlength="120" placeholder="Una línea para el catálogo"></div>
             <div class="two">
               <div class="field"><label for="sPrice">Precio por evento (CLP)</label><input id="sPrice" type="number" min="0" step="1000" inputmode="numeric"></div>

@@ -105,13 +105,14 @@ function applyCatalog(cat){
     if(c.img!==undefined)it.img=c.img||'';
     if(c.model!==undefined)it.model=c.model||'';
     if(c.modelRot!=null)it.modelRot=+c.modelRot||0;
+    if(c.domicilio!==undefined)it.domicilio=c.domicilio!==false;
   });
   CAT.length=0;ALL.filter(i=>i.active!==false||i.id==='parcela').forEach(i=>CAT.push(i));
   DESIGN.length=0;CAT.filter(i=>i.id!=='parcela').forEach(i=>DESIGN.push(i));
 }
 const SHAPES={castle:'Inflable con torres',slide:'Tobogán inflable',field:'Cancha inflable',table:'Mesa de juego',pingpong:'Mesa de ping pong',machine:'Máquina o carro de comida',pool:'Piscina',box:'Otro objeto (caja)'};
-const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false,imagen:it.img||null,modelo3d:it.model||null,modelo_rot:it.modelRot||0});
-const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo,img:x.imagen||'',model:x.modelo3d||'',modelRot:x.modelo_rot||0});
+const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false,imagen:it.img||null,modelo3d:it.model||null,modelo_rot:it.modelRot||0,domicilio:it.domicilio!==false});
+const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo,img:x.imagen||'',model:x.modelo3d||'',modelRot:x.modelo_rot||0,domicilio:x.domicilio!==false});
 
 
 /* ============ Fotos y modelos 3D ============ */
@@ -207,7 +208,8 @@ function buildClients(res,extras){
     if(!c.nacimiento&&cl.kidBirth)c.nacimiento=cl.kidBirth;
     const names=Object.entries(r.items||{}).map(([k,q])=>(byId(k)?byId(k).name:k)+(q>1?' ×'+q:''));
     if(r.parcela)names.unshift('Parcela');
-    c.eventos.push({fecha:r.date,arrendo:names.join(', '),total:r.total||0,estado:r.status,folio:r.id});
+    else if(r.modalidad==='domicilio')names.unshift('A domicilio');
+    c.eventos.push({fecha:r.date,arrendo:names.join(', '),total:r.total||0,estado:r.status,folio:r.id,modalidad:r.modalidad||'parcela',direccion:r.lugar&&r.lugar.direccion||''});
     c.total+=(r.status==='confirmada'||r.status==='finalizada'?r.abono||0:0)+(r.status==='finalizada'?(r.total||0)-(r.abono||0):0);
   });
   (extras||[]).forEach(x=>{
@@ -257,6 +259,39 @@ function monthlyBalance(res,extras,year){
   return rows;
 }
 
+
+/* ============ Arriendo a domicilio ============ */
+const SUELOS={pasto:'Pasto',tierra:'Tierra',cemento:'Cemento',baldosa:'Baldosa o piso interior',arena:'Arena',adoquin:'Adoquín o ladrillo',otro:'Otro'};
+const TIPOS_LUGAR={casa:'Casa (patio o jardín)',depto:'Departamento o condominio',salon:'Salón o local de eventos',colegio:'Colegio o jardín infantil',otro:'Otro'};
+const ZONAS_DEMO=[{id:'arica',nombre:'Arica urbana',precio:10000,activa:true},{id:'azapa',nombre:'Valle de Azapa y alrededores',precio:15000,activa:true},{id:'lluta',nombre:'Valle de Lluta y Poconchile',precio:25000,activa:true}];
+const zonaFromRow=x=>({id:x.id,nombre:x.nombre,precio:x.precio,activa:x.activa!==false});
+const nf=x=>String(Math.round(+x*100)/100).replace('.',',');
+const needsPower=it=>['castle','slide','field','machine'].includes(it.shape);
+const isInflable=it=>['castle','slide','field'].includes(it.shape);
+/* Revisa si los servicios caben y se pueden montar en el lugar que describe el cliente.
+   issues = impide reservar (no cabe físicamente) · warns = el equipo lo revisa con el cliente */
+function siteChecks(lugar,items){
+  const out={issues:[],warns:[]};lugar=lugar||{};
+  const ancho=+lugar.ancho||0,largo=+lugar.largo||0,alto=lugar.alto===''||lugar.alto==null?0:+lugar.alto;
+  const list=Object.entries(items||{}).map(([id,q])=>({it:byId(id),q:+q})).filter(x=>x.it&&x.q>0&&x.it.id!=='parcela');
+  let area=0;
+  list.forEach(({it,q})=>{
+    area+=it.w*it.d*q;
+    if(ancho>0&&largo>0&&!((it.w<=ancho&&it.d<=largo)||(it.w<=largo&&it.d<=ancho)))out.issues.push(`${it.name} mide ${nf(it.w)} × ${nf(it.d)} m y tu espacio es de ${nf(ancho)} × ${nf(largo)} m: no cabe.`);
+    if(alto>0&&it.h>alto)out.issues.push(`${it.name} mide ${nf(it.h)} m de alto y el espacio libre es de ${nf(alto)} m.`);
+  });
+  const sp=ancho*largo;
+  if(sp>0&&area>sp)out.issues.push(`Los servicios elegidos ocupan ${nf(area)} m² y tu espacio tiene ${nf(sp)} m²: no caben todos juntos. Quita alguno o indica un espacio mayor.`);
+  else if(sp>0&&area>sp*.7)out.warns.push(`Los servicios ocupan ${nf(area)} m² de ${nf(sp)} m²: puede quedar muy justo. El equipo lo revisará contigo.`);
+  if(list.some(x=>needsPower(x.it))&&lugar.luz==='no')out.warns.push('Los inflables y las máquinas necesitan un enchufe de 220 V cerca. Si no hay, consúltanos antes de pagar.');
+  if(list.some(x=>x.it.shape==='pool')&&lugar.agua==='no')out.warns.push('Las piscinas necesitan agua cerca para llenarlas.');
+  if(['cemento','baldosa','adoquin'].includes(lugar.suelo)&&list.some(x=>isInflable(x.it)))out.warns.push('En piso duro los inflables se fijan con pesas en lugar de estacas.');
+  if(lugar.pendiente==='inclinado'&&list.some(x=>isInflable(x.it)||x.it.shape==='pool'))out.warns.push('Un terreno inclinado puede impedir montar piscinas e inflables; el equipo lo evaluará.');
+  if(+lugar.acceso>0&&+lugar.acceso<80)out.warns.push('Un acceso de menos de 80 cm puede impedir ingresar algunos juegos.');
+  if(lugar.nivel&&lugar.nivel!=='planta')out.warns.push('Montaje fuera de la planta baja: el equipo confirmará si es posible subir los juegos.');
+  return out;
+}
+
 const SLOT_OK=Object.keys(SLOTS);
 const API={
   mode:LIVE?'supabase':'demo',
@@ -269,33 +304,39 @@ const API={
       const c=sb();
       const [d,b,k]=await Promise.all([
         c.rpc('disponibilidad'),
-        c.from('fechas_bloqueadas').select('fecha,motivo').gte('fecha',iso(today)),
+        c.from('fechas_bloqueadas').select('fecha,motivo,aplica').gte('fecha',iso(today)),
         c.from('catalogo').select('*')
       ]).then(r=>r.map(ok));
       const terrain=await c.from('terreno').select('*').eq('id',1).maybeSingle().then(r=>r.error?null:terrainFromRow(r.data),()=>null);  // si la tabla aún no existe, se usa el terreno de ejemplo
       const ofertas=await c.from('ofertas').select('*').then(r=>r.error?[]:(r.data||[]).map(offerFromRow),()=>[]);   // si la tabla aún no existe, no hay ofertas
+      const zonas=await c.from('zonas_despacho').select('*').order('orden').then(r=>r.error?[]:(r.data||[]).map(zonaFromRow),()=>[]);
       return {
-        terrain,ofertas,
+        terrain,ofertas,zonas,
         res:(d||[]).map(x=>({date:x.fecha,slot:x.franja,items:x.items||{},parcela:!!x.parcela,status:'activa'})),
-        blocked:(b||[]).map(x=>({date:x.fecha,why:x.motivo||''})),
+        blocked:(b||[]).map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
         catalog:Object.fromEntries((k||[]).map(x=>[x.item_id,fromRow(x)]))
       };
     }
     const s=demoLoad();
-    return {terrain:s.terrain||null,ofertas:(s.ofertas||[]).filter(offerActive),res:s.res.map(r=>({date:r.date,slot:r.slot,items:r.items,parcela:r.parcela,status:r.status})),blocked:s.blocked,catalog:s.catalog||{}};
+    return {terrain:s.terrain||null,zonas:(s.zonas||ZONAS_DEMO).filter(z=>z.activa!==false),ofertas:(s.ofertas||[]).filter(offerActive),res:s.res.map(r=>({date:r.date,slot:r.slot,items:r.items,parcela:r.parcela,status:r.status})),blocked:s.blocked,catalog:s.catalog||{}};
   },
   async createReservation(p){
     if(LIVE){
       const r=ok(await sb().rpc('crear_reserva',{
         p_fecha:p.date,p_franja:p.slot,p_nombre:p.client.name,p_email:p.client.email,p_telefono:p.client.phone,
         p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn,p_online:!!p.online,
-        p_nino:p.client.kid,p_nacimiento:p.client.kidBirth,p_acepta:!!p.client.consent}));
+        p_nino:p.client.kid,p_nacimiento:p.client.kidBirth,p_acepta:!!p.client.consent,
+        p_modalidad:p.modalidad||'parcela',p_lugar:p.lugar||null,p_zona:p.zona||null}));
       return r;
     }
     const s=demoLoad();
-    const total=Object.entries(p.items).reduce((a,[k,q])=>a+byId(k).price*q,0)+(p.parcela?byId('parcela').price:0);
+    const dom=p.modalidad==='domicilio';
+    const zona=dom?(s.zonas||ZONAS_DEMO).find(z=>z.id===p.zona&&z.activa!==false):null;
+    if(dom&&!zona)throw new Error('Elige la zona de despacho.');
+    const flete=zona?zona.precio:0;
+    const total=Object.entries(p.items).reduce((a,[k,q])=>a+byId(k).price*q,0)+(!dom&&p.parcela?byId('parcela').price:0)+flete;
     const abono=Math.round(total*.3),folio='R-'+(s.seq++);
-    s.res.push({id:folio,date:p.date,slot:p.slot,client:p.client,items:p.items,parcela:p.parcela,status:'confirmada',total,abono,method:p.method,txn:p.txn,layout:p.layout});
+    s.res.push({id:folio,date:p.date,slot:p.slot,client:p.client,items:p.items,parcela:dom?false:p.parcela,modalidad:dom?'domicilio':'parcela',lugar:dom?p.lugar:null,flete,zona:dom?p.zona:'',status:'confirmada',total,abono,method:p.method,txn:p.txn,layout:dom?[]:p.layout});
     demoSave(s);
     return {folio,total,abono,estado:'confirmada'};
   },
@@ -350,7 +391,7 @@ const API={
       const c=sb();
       const [r,b,k]=await Promise.all([
         c.from('reservas').select('*').order('fecha',{ascending:true}).order('franja',{ascending:true}),
-        c.from('fechas_bloqueadas').select('fecha,motivo').order('fecha'),
+        c.from('fechas_bloqueadas').select('fecha,motivo,aplica').order('fecha'),
         c.from('catalogo').select('*')
       ]).then(x=>x.map(ok));
       const terrain=await c.from('terreno').select('*').eq('id',1).maybeSingle().then(r=>r.error?null:terrainFromRow(r.data),()=>null);
@@ -359,22 +400,24 @@ const API={
         soft(c.from('clientes_extra').select('*').order('id'),clienteFromRow),
         soft(c.from('ofertas').select('*').order('id'),offerFromRow),
         soft(c.from('propuestas').select('clave'),x=>x.clave)]);
+      const zonas=await soft(c.from('zonas_despacho').select('*').order('orden'),zonaFromRow);
       return {
-        terrain,clientes,ofertas,propuestas:props,
-        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||''})),
-        blocked:b.map(x=>({date:x.fecha,why:x.motivo||''})),
+        terrain,clientes,ofertas,propuestas:props,zonas,
+        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||'',modalidad:x.modalidad||'parcela',lugar:x.lugar||null,flete:x.flete||0,zona:x.zona||''})),
+        blocked:b.map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
         catalog:Object.fromEntries(k.map(x=>[x.item_id,fromRow(x)]))
       };
     }
-    const s=demoLoad();return {terrain:s.terrain||null,res:s.res,blocked:s.blocked,catalog:s.catalog||{},clientes:s.clientes||[],ofertas:s.ofertas||[],propuestas:s.propuestas||[]};
+    const s=demoLoad();return {terrain:s.terrain||null,res:s.res,blocked:s.blocked,catalog:s.catalog||{},clientes:s.clientes||[],ofertas:s.ofertas||[],propuestas:s.propuestas||[],zonas:s.zonas||ZONAS_DEMO};
   },
   async setStatus(folio,status){
     if(LIVE){ok(await sb().from('reservas').update({estado:status}).eq('folio',folio));return}
     const s=demoLoad();const r=s.res.find(x=>x.id===folio);if(r)r.status=status;demoSave(s);
   },
-  async addBlock(date,why){
-    if(LIVE){ok(await sb().from('fechas_bloqueadas').insert({fecha:date,motivo:why}));return}
-    const s=demoLoad();s.blocked.push({date,why});demoSave(s);
+  async addBlock(date,why,aplica){
+    aplica=aplica||'todo';
+    if(LIVE){ok(await sb().from('fechas_bloqueadas').insert({fecha:date,motivo:why,aplica}));return}
+    const s=demoLoad();s.blocked.push({date,why,aplica});demoSave(s);
   },
   async removeBlock(date){
     if(LIVE){ok(await sb().from('fechas_bloqueadas').delete().eq('fecha',date));return}
@@ -384,7 +427,7 @@ const API={
   async saveService(it){
     if(LIVE){ok(await sb().from('catalogo').upsert(rowOf(it),{onConflict:'item_id'}));return}
     const s=demoLoad();s.catalog=s.catalog||{};
-    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false,img:it.img||'',model:'',modelRot:0};
+    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false,img:it.img||'',model:'',modelRot:0,domicilio:it.domicilio!==false};
     demoSave(s);
   },
   /* guarda el terreno completo (medidas, suelo, cerco, foto, modelo y elementos) */
@@ -407,6 +450,16 @@ const API={
     const up=await st.upload(path,fileOrBlob,{upsert:true,contentType:kind==='model'?'model/gltf-binary':'image/jpeg',cacheControl:'31536000'});
     if(up.error)throw new Error(up.error.message);
     return st.getPublicUrl(path).data.publicUrl;
+  },
+  /* ---------- zonas de despacho (arriendo a domicilio) ---------- */
+  async saveZona(z){
+    if(LIVE){const row={id:z.id,nombre:z.nombre,precio:Math.round(z.precio),activa:z.activa!==false,orden:z.orden||100};ok(await sb().from('zonas_despacho').upsert(row,{onConflict:'id'}));return}
+    const s=demoLoad();s.zonas=s.zonas||ZONAS_DEMO.map(z=>Object.assign({},z));const i=s.zonas.findIndex(x=>x.id===z.id);
+    if(i>=0)s.zonas[i]=Object.assign({},z);else s.zonas.push(Object.assign({},z));demoSave(s);
+  },
+  async deleteZona(id){
+    if(LIVE){ok(await sb().from('zonas_despacho').delete().eq('id',id));return}
+    const s=demoLoad();s.zonas=(s.zonas||ZONAS_DEMO).filter(x=>x.id!==id);demoSave(s);
   },
   /* ---------- cartera, ofertas y propuestas ---------- */
   async saveCliente(c){
@@ -444,5 +497,5 @@ const API={
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,SUELOS,TIPOS_LUGAR,siteChecks,needsPower,isInflable,nf,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
 })();
