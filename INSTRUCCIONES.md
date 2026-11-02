@@ -32,7 +32,7 @@ Si `SUPABASE_URL` y `SUPABASE_ANON_KEY` están vacíos en `config.js`, todo func
 ### Paso 2 · Crear las tablas
 1. Menú izquierdo > **SQL Editor** > **New query**.
 2. Copia **todo** el contenido de `schema.sql`, pégalo y pulsa **Run**. Debe decir "Success".
-3. En **Table Editor** verás `reservas`, `catalogo`, `fechas_bloqueadas` y `admins`. El catálogo trae los 11 servicios de ejemplo.
+3. En **Table Editor** verás 9 tablas: `reservas`, `catalogo`, `fechas_bloqueadas`, `admins`, `terreno`, `clientes_extra`, `ofertas`, `propuestas` y `zonas_despacho`. El catálogo trae los 11 servicios de ejemplo.
 
 Si ya habías ejecutado una versión anterior, vuelve a ejecutar este archivo: **actualiza sin borrar** tus reservas ni los precios que hayas cambiado.
 
@@ -139,13 +139,14 @@ En `admin.html`, sección **Agregar servicio** y **Servicios y precios**:
 
 ## Clientes, cumpleaños, balance y ofertas (panel admin)
 
-El panel tiene seis pestañas:
+El panel tiene siete pestañas:
 
 - **Reservas:** lo de siempre (estados, distribución 3D, bloqueo de fechas).
 - **Clientes:** la cartera. Cada reserva del sitio agrega sola al apoderado, al niño, su nacimiento, el celular y lo que arrendó. También puedes **agregar a mano** clientes anteriores (formulario de abajo). Botón **Descargar Excel**: hojas *Clientes*, *Eventos* (ordenados por fecha, con el mes) y *Cumpleaños*.
 - **Cumpleaños:** arriba, los cumpleañeros **destacados** (los que cumplen en los próximos 30 días o cumplieron hace menos de 15 y ya arrendaron algo). Abajo, las **propuestas por enviar**: aparecen hasta 35 días antes del cumpleaños. El botón *Enviar por WhatsApp* abre WhatsApp con el mensaje ya escrito (apoderado, niño, edad, ofertas vigentes y enlace al sitio); tú solo lo envías y luego pulsas *Marcar enviada* para que no se repita ese año. El texto del mensaje se puede editar (se guarda en ese navegador).
 - **Balance:** por mes y año, según la fecha del evento: eventos, contratado, abonos, saldos cobrados, cobrado y por cobrar, con un Excel descargable. Regla: **Confirmada** = abono cobrado; **Finalizada** = el evento se hizo y el saldo se cobró (cámbiala a mano en *Reservas* cuando cobres el saldo); **Pendiente** = el abono aún no se valida; **Cancelada** no cuenta.
 - **Ofertas:** el tablón de ofertas. Las activas y no vencidas se muestran en una sección del sitio (con botón a WhatsApp) y se incluyen en las propuestas de cumpleaños.
+- **Domicilio:** zonas y precios de despacho, y los pedidos a domicilio próximos con los datos del lugar y sus alertas (ver «Arriendo a domicilio» más abajo).
 - **Servicios y terreno:** el catálogo y el editor del terreno.
 
 **Importante al actualizar una base ya creada:** vuelve a pegar el `schema.sql` completo en Supabase (es seguro repetirlo). Agrega los datos del niño a las reservas y las tablas de clientes, ofertas y propuestas.
