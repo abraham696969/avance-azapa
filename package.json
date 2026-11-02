@@ -1,0 +1,15 @@
+{
+  "name": "diverti-kids",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Divertí Kids: sitio de reservas con simulador 3D, panel de administración y pago del abono con Flow. Servidor para Railway.",
+  "scripts": {
+    "start": "node server/index.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

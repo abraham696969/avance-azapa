@@ -1,12 +1,12 @@
 /* Configuración de Divertí Kids.
-   Mientras SUPABASE_URL y SUPABASE_ANON_KEY estén vacíos, el sitio funciona en MODO DEMO
-   (datos guardados solo en el navegador, pago simulado). Ver INSTRUCCIONES.md. */
+   No hay claves aquí: cuando el sitio lo entrega el servidor de Railway, el servidor agrega solo
+   SERVIDOR:true (base de datos conectada) y activa el pago con Flow si sus claves están en Railway.
+   Si abres los archivos sin el servidor, el sitio funciona en MODO DEMO (datos solo en el navegador,
+   pago simulado). Ver INSTRUCCIONES.md. */
 window.DK_CONFIG={
-  SUPABASE_URL:"",       // ejemplo: "https://abcdxyz.supabase.co"
-  SUPABASE_ANON_KEY:"",  // la clave "anon public" (es pública, la seguridad la dan las reglas de la base)
-
-  PAGO_ONLINE:false,     // true = el abono se paga en Flow (requiere el paso 7 de INSTRUCCIONES.md)
-  PAGO_PRUEBAS:true      // true = se muestra "ambiente de pruebas"; ponlo en false cuando uses las claves reales de Flow
+  SERVIDOR:false,        // lo pone el servidor; no lo cambies a mano
+  PAGO_ONLINE:false,     // lo pone el servidor según las claves de Flow
+  PAGO_PRUEBAS:true      // lo pone el servidor: true mientras Flow esté en su ambiente de pruebas
 };
 
 /* Datos del negocio que usa el chatbot. Lo que dejes vacío ("") el chatbot lo deriva a una persona.

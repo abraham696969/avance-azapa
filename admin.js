@@ -6,7 +6,7 @@ const openDet=new Set();
 
 /* ---------- vistas ---------- */
 function show(which){$('#loginView').hidden=which!=='login';$('#panelView').hidden=which!=='panel'}
-function setBadge(){const b=$('#modeBadge');b.textContent=API.mode==='supabase'?'Base de datos conectada':'Modo demo';b.className='modebadge'+(API.mode==='supabase'?' live':'')}
+function setBadge(){const b=$('#modeBadge');b.textContent=API.mode==='servidor'?'Base de datos conectada':'Modo demo';b.className='modebadge'+(API.mode==='servidor'?' live':'')}
 
 /* ---------- login ---------- */
 $('#loginForm').addEventListener('submit',async e=>{
@@ -92,7 +92,7 @@ let pImg=null,pModel=null;   // archivos elegidos y aún no guardados ('quitar' 
 let curImg='',curModel='';
 function showImg(src){const p=$('#sImgPrev');if(src){p.src=src;p.hidden=false}else{p.removeAttribute('src');p.hidden=true}$('#sImgDel').hidden=!src}
 function showModel(has,name){$('#sModelDel').hidden=!has;$('#sModelNote').textContent=has?('Modelo cargado: '+(name||'actual')+'. Se ajusta al ancho y largo reales.'):'Si no subes uno, el simulador usa una figura simple con las medidas y el color de arriba. El modelo se ajusta solo al ancho y largo reales.'}
-if(API.mode==='demo'){$('#sModel').disabled=true;$('#sModelNote').textContent='Los modelos 3D reales se pueden subir cuando conectes la base de datos (Supabase). En modo demo se usa la figura simple.'}
+if(API.mode==='demo'){$('#sModel').disabled=true;$('#sModelNote').textContent='Los modelos 3D reales se pueden subir cuando el sitio funcione con el servidor y la base de datos (Railway). En modo demo se usa la figura simple.'}
 $('#sImg').addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;const err=$('#sErr');err.hidden=true;
   if(f.size>15*1024*1024){err.textContent='La foto pesa demasiado (máximo 15 MB).';err.hidden=false;e.target.value='';return}
@@ -143,7 +143,7 @@ const TT=DK.TERRAIN_TYPES;
 $('#tGround').innerHTML=Object.entries(DK.GROUNDS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 $('#eTex').innerHTML='<option value="">Sin textura</option>'+Object.entries(DK.TEXTURES).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 $('#eType').innerHTML=$('#eT').innerHTML=Object.entries(TT).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
-if(API.mode==='demo'){$('#tModel').disabled=true;$('#tModelNote').textContent='Los modelos 3D del terreno se pueden subir cuando conectes la base de datos (Supabase). En modo demo se usa el terreno dibujado.'}
+if(API.mode==='demo'){$('#tModel').disabled=true;$('#tModelNote').textContent='Los modelos 3D del terreno se pueden subir cuando el sitio funcione con el servidor y la base de datos (Railway). En modo demo se usa el terreno dibujado.'}
 const teItem=id=>TE.t.items.find(o=>o.id===id);
 const clampN=(v,lo,hi)=>Math.min(hi,Math.max(lo,v)),snap=v=>Math.round(v*10)/10;
 function teLoad(){TE.t=DK.terrainOf();TE.sel=null;TE.dirty=false;TE.pPhoto=null;TE.pModel=null;TE.photoPrev=TE.t.photo;teFill();teDraw();teSel()}

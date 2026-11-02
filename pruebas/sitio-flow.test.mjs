@@ -1,100 +1,83 @@
-// Recorrido en modo EN LÍNEA con una base de datos simulada (no necesita internet ni Supabase):
-// pago con Flow, pantalla de retorno en sus distintos estados y panel admin con la base.
-import { createRequire } from 'node:module'; import path from 'node:path'; import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url'; import { servir } from './_servidor.mjs';
+// Recorrido completo en el navegador con el servidor de Railway, una base PostgreSQL en memoria y un Flow simulado:
+// reservar, pagar en Flow, volver al sitio, y usar el panel con login real, cambios y archivos.
+import { createRequire } from 'node:module'; import assert from 'node:assert/strict';
+import { servidor, ADMIN } from './_railway.mjs';
 const { chromium } = createRequire(import.meta.url)('playwright');
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const CONFIG = `window.DK_CONFIG={SUPABASE_URL:"https://fake.supabase.co",SUPABASE_ANON_KEY:"anon",PAGO_ONLINE:true,PAGO_PRUEBAS:true};window.DK_NEGOCIO={};`;
-// Cliente de Supabase simulado; el estado vive en localStorage para sobrevivir a la ida y vuelta a Flow
-const FAKE = `(function(){
-const SEED=[['castillo','Castillo inflable','juegos',45000,2,4.5,4.5,3.5,'#ff5fa2','castle'],['parcela','Arriendo de la parcela','local',150000,1,30,20,0,'#7ccf7a','land']]
- .map(r=>({item_id:r[0],nombre:r[1],descripcion:'',categoria:r[2],precio:r[3],stock:r[4],ancho:r[5],largo:r[6],alto:r[7],color:r[8],color_tope:null,forma:r[9],activo:true,orden:1}));
-const load=()=>{try{return JSON.parse(localStorage.__F)}catch(e){return {cat:SEED,res:[],blocked:[],calls:[],status:null,session:null}}};
-const save=F=>{localStorage.__F=JSON.stringify(F)};
-const mk=t=>{const o={t,a:'select',f:[],p:null};const b={maybeSingle:()=>{o.one=true;return b},select:()=>b,order:()=>b,gte:(c,v)=>{o.f.push(['gte',c,v]);return b},eq:(c,v)=>{o.f.push(['eq',c,v]);return b},
- upsert:p=>{o.a='upsert';o.p=p;return b},update:p=>{o.a='update';o.p=p;return b},insert:p=>{o.a='insert';o.p=p;return b},delete:()=>{o.a='delete';return b},
- then:(ok,ko)=>Promise.resolve(run(o)).then(ok,ko)};return b};
-function run(o){const F=load();let data=[];const key={catalogo:'item_id',reservas:'folio',fechas_bloqueadas:'fecha',terreno:'id',ofertas:'id',clientes_extra:'id',propuestas:'clave',zonas_despacho:'id'}[o.t],tab={catalogo:'cat',reservas:'res',fechas_bloqueadas:'blocked',terreno:'terr',ofertas:'ofe',clientes_extra:'cli',propuestas:'pro',zonas_despacho:'zon'}[o.t];F.terr=F.terr||[];F.ofe=F.ofe||[];F.cli=F.cli||[];F.pro=F.pro||[];F.zon=F.zon||[];
- const match=r=>o.f.every(([k,c,v])=>k==='eq'?r[c]===v:true);
- if(o.a==='select'){data=F[tab].filter(r=>(o.t!=='catalogo'||F.session||r.activo));}
- if(o.a==='upsert'){const i=F[tab].findIndex(r=>r[key]===o.p[key]);i>=0?F[tab][i]=Object.assign(F[tab][i],o.p):F[tab].push(o.p)}
- if(o.a==='update'){F[tab].filter(match).forEach(r=>Object.assign(r,o.p))}
- if(o.a==='insert'){F[tab].push(o.p)} if(o.a==='delete'){F[tab]=F[tab].filter(r=>!match(r))}
- F.calls.push({tabla:o.t,accion:o.a,datos:o.p});save(F);return {data:o.one?(data[0]||null):data,error:null}}
-window.supabase={createClient:()=>({
- from:mk,
- rpc:async(n,a)=>{const F=load();F.calls.push({rpc:n,args:a});let data=null;
-  if(n==='disponibilidad')data=[];
-  if(n==='es_admin')data=true;
-  if(n==='crear_reserva'){const folio='R-1006';data={folio,codigo:'COD1',total:195000,abono:58500,estado:a.p_online?'por_pagar':'pendiente'};
-    F.res.push({folio,fecha:a.p_fecha,franja:a.p_franja,nombre:a.p_nombre,email:a.p_email,telefono:a.p_telefono,invitados:a.p_invitados,items:a.p_items,parcela:a.p_parcela,layout:a.p_layout,total:195000,abono:58500,metodo_pago:a.p_metodo,transaccion:'',estado:data.estado,nota:'',nombre_nino:a.p_nino,nacimiento_nino:a.p_nacimiento})}
-  if(n==='estado_reserva')data=F.status;
-  save(F);return {data,error:null}},
- storage:{from:b=>({upload:async(p,file,o)=>{const F=load();(F.uploads=F.uploads||[]).push({bucket:b,path:p,type:o&&o.contentType,size:file.size});save(F);return {data:{path:p},error:null}},getPublicUrl:p=>({data:{publicUrl:'https://fake.supabase.co/storage/v1/object/public/'+b+'/'+p}})})},
- functions:{invoke:async(n,o)=>{const F=load();F.calls.push({fn:n,body:o.body});save(F);return {data:{url:'https://sandbox.flow.cl/pay?token=T'},error:null}}},
- auth:{getSession:async()=>({data:{session:load().session}}),signInWithPassword:async({email})=>{const F=load();F.session={user:{email}};save(F);return {error:null}},signOut:async()=>{const F=load();F.session=null;save(F);return {}}}
-})}})();`;
-
-const srv = await servir(root, { '/config.js': CONFIG });
+const s = await servidor();
+const db = (sql, p) => s.db.query(sql, p).then((r) => r.rows);
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-await ctx.route(/(cdnjs|googleapis|gstatic)/, r => r.abort());
-await ctx.route(/jsdelivr/, r => r.fulfill({ contentType: 'text/javascript', body: FAKE }));
-let flowVisit = null;
-await ctx.route('https://sandbox.flow.cl/**', r => { flowVisit = r.request().url(); r.fulfill({ contentType: 'text/html', body: '<h1>Flow (simulado)</h1>' }); });
-const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
-const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
-const F = () => p.evaluate(() => JSON.parse(localStorage.__F));
-const setStatus = s => p.evaluate(v => { const F = JSON.parse(localStorage.__F); F.status = v; localStorage.__F = JSON.stringify(F); }, s);
+await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, (r) => r.abort());
+const errs = []; let n = 0; const ok = (m) => console.log('  ✓', m, `(${++n})`);
+const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message));
 
-await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
-await p.click('[data-add="castillo"]'); await p.fill('#cKid','Sofía'); await p.fill('#cKidBirth','2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
-assert(!(await p.isVisible('#cardBlock'))); assert(await p.isVisible('#onlineNote')); ok('con pago en línea se ocultan los campos de tarjeta de prueba y se explica el pago en Flow');
+// --- reservar y pagar ---
+await p.goto(s.url + '/index.html'); await p.waitForTimeout(900);
+await p.click('[data-add="castillo"]'); await p.fill('#cKid', 'Sofía'); await p.fill('#cKidBirth', '2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
+assert(!(await p.isVisible('#cardBlock'))); assert(await p.isVisible('#onlineNote')); ok('con el servidor y Flow activos se ocultan los campos de tarjeta de prueba y se explica el pago en Flow');
 assert((await p.textContent('#payGo')).includes('Flow')); ok('el botón dice "Ir a pagar a Flow"');
-await p.click('#payGo'); await p.waitForURL(/sandbox\.flow\.cl/, { timeout: 5000 });
-assert.equal(flowVisit, 'https://sandbox.flow.cl/pay?token=T'); ok('el navegador es enviado a la dirección de pago que entregó la función de servidor');
-await p.goto(srv.url + '/index.html'); await p.waitForTimeout(500);
-const calls = (await F()).calls; const cr = calls.find(c => c.rpc === 'crear_reserva'), inv = calls.find(c => c.fn);
-assert.equal(cr.args.p_modalidad, 'parcela'); assert.equal(cr.args.p_lugar, null);
-assert.equal(cr.args.p_nino, 'Sofía'); assert.equal(cr.args.p_nacimiento, '2020-03-05'); assert.equal(cr.args.p_acepta, true);
-assert.equal(cr.args.p_online, true); assert.equal(cr.args.p_metodo, 'Flow'); ok('la reserva se crea "online" (queda por pagar y guarda el cupo)');
-assert.deepEqual(inv.body, { folio: 'R-1006', codigo: 'COD1' }); assert.equal(inv.fn, 'flow-crear-pago'); ok('a la función de pago solo se le envían folio y código (el monto lo pone el servidor)');
+await p.click('#payGo'); await p.waitForURL(/\/pay\?token=TOK1/, { timeout: 8000 });
+ok('el navegador es enviado a la página de pago que entregó Flow');
+const [res] = await db('select * from reservas');
+assert.equal(res.estado, 'por_pagar'); assert.equal(res.nombre_nino, 'Sofía'); assert.equal(res.nacimiento_nino, '2020-03-05'); assert.equal(res.acepta_datos, true);
+assert.equal(res.modalidad, 'parcela'); assert.equal(res.metodo_pago, 'Flow'); assert.equal(res.total, 195000);
+ok('la reserva quedó en la base "por pagar", con los datos del niño, el consentimiento y el total calculado por el servidor');
+const pago = s.flow.log.find((x) => x.path === '/api/payment/create').params;
+assert.equal(pago.amount, '58500'); ok('a Flow se le cobró el abono que fijó el servidor (58.500)');
 
-const ver = async (estado, texto, extra) => {
-  await setStatus(estado); await p.goto(srv.url + '/index.html?folio=R-1006&c=COD1'); await p.waitForTimeout(1200);
-  const t = await p.textContent('#bookArea'); assert(t.includes(texto), `${estado}: esperaba "${texto}" y salió "${t.slice(0, 120)}"`);
-  assert(!p.url().includes('folio='));
+// Flow confirma el pago y devuelve al cliente al sitio
+await fetch(s.url + '/api/flow/confirmacion', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'token=TOK1' });
+await p.goto(s.url + '/api/flow/retorno?token=TOK1'); await p.waitForTimeout(1300);
+assert((await p.textContent('#bookArea')).includes('¡Pago recibido!')); assert(!p.url().includes('folio=')); assert.equal((await db('select estado from reservas'))[0].estado, 'confirmada');
+ok('al volver de Flow se ve "¡Pago recibido!", la reserva está confirmada en la base y la dirección queda limpia');
+const ver = async (texto, codigo = res.codigo) => {
+  await p.goto(s.url + `/index.html?folio=${res.folio}&c=${codigo}`); await p.waitForTimeout(1200);
+  const t = await p.textContent('#bookArea'); assert(t.includes(texto), `esperaba "${texto}" y salió "${t.slice(0, 120)}"`);
 };
-await ver({ folio: 'R-1006', fecha: '2026-12-12', franja: 'tarde', total: 195000, abono: 58500, estado: 'confirmada' }, '¡Pago recibido!'); ok('retorno con pago confirmado muestra la confirmación y limpia la dirección');
-await ver({ folio: 'R-1006', fecha: '2026-12-12', franja: 'tarde', total: 195000, abono: 58500, estado: 'pendiente' }, 'Recibimos tu pago'); ok('retorno con revisión pendiente lo explica');
-await ver({ folio: 'R-1006', fecha: '2026-12-12', franja: 'tarde', total: 195000, abono: 58500, estado: 'expirada' }, 'El pago no se completó'); ok('retorno con plazo vencido ofrece reservar de nuevo');
-await ver(null, 'No encontramos esa reserva'); ok('retorno con código incorrecto no muestra datos');
+await db("update reservas set estado = 'pendiente'"); await ver('Recibimos tu pago'); ok('retorno con revisión pendiente lo explica');
+await db("update reservas set estado = 'por_pagar', expira = now() - interval '1 minute'"); await ver('El pago no se completó'); ok('retorno con plazo vencido ofrece reservar de nuevo');
+await ver('No encontramos esa reserva', 'otro'); ok('retorno con código incorrecto no muestra datos');
+await db("update reservas set estado = 'confirmada', expira = null");
 
-// panel admin contra la base
-const a = await ctx.newPage(); a.on('pageerror', e => errs.push('admin: ' + e.message)); a.on('dialog', d => d.accept());
-await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500);
-assert(await a.isVisible('#loginView')); assert(!(await a.isVisible('#demoHint'))); ok('con base conectada no aparece la clave de demo');
-await a.fill('#lMail', 'jefa@divertikids.cl'); await a.fill('#lPass', 'xx'); await a.click('#lBtn'); await a.waitForTimeout(600);
-assert(await a.isVisible('#panelView')); assert((await a.textContent('#modeBadge')).includes('Base de datos')); ok('login contra la base y panel visible');
-assert(await a.locator('[data-st="R-1006"]').inputValue() === 'por_pagar'); ok('la reserva por pagar se ve con su estado');
-await a.selectOption('[data-st="R-1006"]', 'confirmada'); await a.waitForTimeout(400); await a.click('[data-tab=catalogo]');
-assert((await a.evaluate(() => JSON.parse(localStorage.__F))).res.find(r => r.folio === 'R-1006').estado === 'confirmada'); ok('cambiar el estado se guarda en la base');
+// --- panel de administración con login real ---
+const a = await ctx.newPage(); a.on('pageerror', (e) => errs.push('admin: ' + e.message)); a.on('dialog', (d) => d.accept());
+await a.goto(s.url + '/admin.html'); await a.waitForTimeout(600);
+assert(await a.isVisible('#loginView')); assert(!(await a.isVisible('#demoHint'))); ok('con el servidor no aparece la clave de demo');
+await a.fill('#lMail', ADMIN.email); await a.fill('#lPass', 'equivocada'); await a.click('#lBtn'); await a.waitForTimeout(500);
+assert((await a.textContent('#lErr')).includes('incorrectos')); ok('una clave equivocada se rechaza');
+await a.fill('#lPass', ADMIN.clave); await a.click('#lBtn'); await a.waitForTimeout(900);
+assert(await a.isVisible('#panelView')); assert((await a.textContent('#modeBadge')).includes('Base de datos')); ok('login real y panel visible con "Base de datos conectada"');
+await a.reload(); await a.waitForTimeout(900); assert(await a.isVisible('#panelView')); ok('la sesión se mantiene al recargar la página');
+assert.equal(await a.locator(`[data-st="${res.folio}"]`).inputValue(), 'confirmada'); ok('la reserva pagada se ve confirmada');
+await a.selectOption(`[data-st="${res.folio}"]`, 'finalizada'); await a.waitForTimeout(500);
+assert.equal((await db('select estado from reservas'))[0].estado, 'finalizada'); ok('cambiar el estado se guarda en la base');
+await a.click('[data-tab=catalogo]');
 await a.fill('#sName', 'Trampolín'); await a.selectOption('#sShape', 'box'); await a.fill('#sPrice', '25000'); await a.fill('#sStock', '2');
-await a.fill('#sW', '3'); await a.fill('#sD', '3'); await a.fill('#sH', '1.2'); await a.click('#sSave'); await a.waitForTimeout(500);
-const fila = (await a.evaluate(() => JSON.parse(localStorage.__F))).cat.find(r => r.nombre === 'Trampolín');
-assert(fila && fila.forma === 'box' && /^#[0-9a-f]{6}$/i.test(fila.color) && fila.precio === 25000 && fila.ancho === 3 && fila.activo === true); ok('el servicio nuevo se guarda con las columnas que espera la base (forma, color, medidas, precio)');
-// foto y modelo 3D reales se suben a Storage y sus direcciones quedan en el servicio
+await a.fill('#sW', '3'); await a.fill('#sD', '3'); await a.fill('#sH', '1.2'); await a.click('#sSave'); await a.waitForTimeout(600);
+const [tr] = await db("select * from catalogo where nombre = 'Trampolín'");
+assert(tr && tr.forma === 'box' && /^#[0-9a-f]{6}$/i.test(tr.color) && tr.precio === 25000 && tr.ancho === 3 && tr.activo === true); ok('el servicio nuevo se guarda en la base con sus columnas (forma, color, medidas, precio)');
+// foto y modelo 3D
 const png = Buffer.from(await a.evaluate(() => { const c = document.createElement('canvas'); c.width = 2400; c.height = 1200; const x = c.getContext('2d'); x.fillStyle = '#3e4095'; x.fillRect(0, 0, 2400, 1200); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
-assert(!(await a.locator('#sModel').isDisabled())); ok('con base conectada el modelo 3D real sí se puede subir');
+assert(!(await a.locator('#sModel').isDisabled())); ok('con el servidor el modelo 3D real sí se puede subir');
 await a.fill('#sName', 'Castillo con modelo'); await a.selectOption('#sShape', 'castle'); await a.fill('#sPrice', '60000'); await a.fill('#sStock', '1');
 await a.fill('#sW', '5'); await a.fill('#sD', '5'); await a.fill('#sH', '4');
 await a.setInputFiles('#sImg', { name: 'f.png', mimeType: 'image/png', buffer: png });
-await a.setInputFiles('#sModel', { name: 'castillo.glb', mimeType: 'model/gltf-binary', buffer: Buffer.alloc(2048, 1) });
-await a.selectOption('#sModelRot', '90'); await a.click('#sSave'); await a.waitForTimeout(900);
-const FF = await a.evaluate(() => JSON.parse(localStorage.__F)), fm = FF.cat.find(r => r.nombre === 'Castillo con modelo');
-assert(FF.uploads.length === 2 && FF.uploads.some(u => u.bucket === 'servicios' && u.type === 'image/jpeg' && /\.jpg$/.test(u.path)) && FF.uploads.some(u => u.bucket === 'modelos' && u.type === 'model/gltf-binary' && /\.glb$/.test(u.path)), JSON.stringify(FF.uploads)); ok('la foto va a la carpeta "servicios" (JPG) y el modelo a "modelos" (.glb)');
-assert(fm.imagen.startsWith('https://fake.supabase.co/storage/v1/object/public/servicios/') && fm.modelo3d.endsWith('.glb') && fm.modelo_rot === 90); ok('en el servicio quedan las direcciones públicas y el giro del modelo');
+await a.setInputFiles('#sModel', { name: 'castillo.glb', mimeType: 'model/gltf-binary', buffer: Buffer.concat([Buffer.from('glTF'), Buffer.alloc(2044, 1)]) });
+await a.selectOption('#sModelRot', '90'); await a.click('#sSave'); await a.waitForTimeout(1200);
+const arch = await db('select id, tipo, length(datos) as peso from archivos order by id');
+assert(arch.length === 2 && arch.some((x) => x.tipo === 'image/jpeg' && /\.jpg$/.test(x.id)) && arch.some((x) => x.tipo === 'model/gltf-binary' && /\.glb$/.test(x.id)), JSON.stringify(arch));
+ok('la foto (reducida a JPG) y el modelo .glb quedan guardados en la base');
+const [cm] = await db("select imagen, modelo3d, modelo_rot from catalogo where nombre = 'Castillo con modelo'");
+assert(cm.imagen.startsWith('/archivos/') && cm.modelo3d.endsWith('.glb') && cm.modelo_rot === 90); ok('en el servicio quedan las direcciones de los archivos y el giro del modelo');
 assert((await a.textContent('#priceBody')).includes('3D real')); ok('la lista del panel marca los servicios con modelo 3D real');
-await b.close(); srv.close();
-console.log(errs.length ? '\nERRORES DE PÁGINA:\n' + errs.join('\n') : `\nTodo bien: ${n} comprobaciones, sin errores de página.`); process.exit(errs.length ? 1 : 0);
+await p.goto(s.url + '/index.html'); await p.waitForTimeout(1000);
+const im = p.locator('#catalog article:has-text("Castillo con modelo") .plan img');
+await im.scrollIntoViewIfNeeded(); await p.waitForFunction(() => { const i = document.querySelector('#catalog article:has(img) .plan img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
+assert((await im.getAttribute('src')).startsWith('/archivos/')); ok('la foto subida se ve en el catálogo público, servida por el servidor');
+await a.click('#logout'); await a.waitForTimeout(400); assert(await a.isVisible('#loginView'));
+await a.reload(); await a.waitForTimeout(700); assert(await a.isVisible('#loginView')); ok('cerrar sesión vuelve al login y la sesión ya no sirve al recargar');
+
+await b.close(); s.close();
+const e2 = s.errores.map(String);
+console.log(errs.length || e2.length ? '\nERRORES:\n' + [...errs, ...e2].join('\n') : `\nTodo bien: ${n} comprobaciones, sin errores de página.`); process.exit(errs.length || e2.length ? 1 : 0);

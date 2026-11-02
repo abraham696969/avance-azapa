@@ -5,130 +5,99 @@
 | Archivo | Para qué sirve |
 |---|---|
 | `index.html` | Sitio de **clientes** (servicios, fecha, simulador 3D, reserva, pago y chatbot). |
-| `admin.html` | Panel de **administración** con su propio login: reservas, fechas bloqueadas y servicios. |
-| `config.js` | Aquí pegas las claves de la base de datos y los datos del negocio para el chatbot. |
-| `schema.sql` | Crea las tablas, reglas de seguridad y funciones de la base de datos (paso 2). |
-| `supabase/functions/` | Tres funciones de servidor para cobrar con Flow (paso 7). |
+| `admin.html` | Panel de **administración** con su propio login: reservas, clientes, cumpleaños, balance, ofertas, domicilio, servicios y terreno. |
+| `config.js` | Datos del negocio para el chatbot y las redes sociales. **No lleva claves.** |
+| `server/index.mjs` | El **servidor**: entrega el sitio, guarda los datos en PostgreSQL, maneja el login del panel y cobra el abono con Flow. |
+| `schema.sql` | Tablas, reglas y funciones de la base de datos. El servidor lo aplica solo al arrancar. |
+| `package.json`, `railway.json` | Le dicen a Railway cómo instalar y arrancar el servidor. |
 | `pruebas/` | Pruebas automáticas y el resultado de la prueba del chatbot. |
-| `shared.js`, `app.js`, `admin.js`, `styles.css` | Código y estilos. No necesitas tocarlos. |
+| `shared.js`, `app.js`, `admin.js`, `styles.css` | Código y estilos del sitio. No necesitas tocarlos. |
 
-Sitio de clientes: `https://tu-sitio.com/` · Panel admin: `https://tu-sitio.com/admin.html`
-
----
-
-## Modo demo (sin base de datos ni pago real)
-
-Si `SUPABASE_URL` y `SUPABASE_ANON_KEY` están vacíos en `config.js`, todo funciona en **modo demo**: los datos se guardan solo en el navegador y el pago es simulado. En `admin.html` entras con **admin@divertikids.cl** y clave **admin1234** (solo es un trámite de la demo, no protege nada).
+Sitio de clientes: `https://tu-sitio/` · Panel admin: `https://tu-sitio/admin.html`
 
 ---
 
-## Base de datos real con Supabase (gratis para empezar)
+## Modo demo (sin servidor ni pago real)
 
-### Paso 1 · Crear el proyecto
-1. Entra a **https://supabase.com**, crea una cuenta y pulsa **New project**. Nombre: `diverti-kids`.
-2. En **Database Password** escribe una clave fuerte y **guárdala**.
-3. En **Region** elige **South America (São Paulo)** y pulsa **Create new project** (1 a 2 minutos).
-
-### Paso 2 · Crear las tablas
-1. Menú izquierdo > **SQL Editor** > **New query**.
-2. Copia **todo** el contenido de `schema.sql`, pégalo y pulsa **Run**. Debe decir "Success".
-3. En **Table Editor** verás 9 tablas: `reservas`, `catalogo`, `fechas_bloqueadas`, `admins`, `terreno`, `clientes_extra`, `ofertas`, `propuestas` y `zonas_despacho`. El catálogo trae los 11 servicios de ejemplo.
-
-Si ya habías ejecutado una versión anterior, vuelve a ejecutar este archivo: **actualiza sin borrar** tus reservas ni los precios que hayas cambiado.
-
-### Paso 3 · Conectar el sitio
-1. **Project Settings** (engranaje) > **API**. Copia **Project URL** y la clave **anon public** (empieza con `eyJ...`). **Nunca** pegues la clave `service_role` en `config.js`.
-2. Abre `config.js` con el Bloc de notas y pégalas:
-
-```js
-window.DK_CONFIG={
-  SUPABASE_URL:"https://abcdxyz.supabase.co",
-  SUPABASE_ANON_KEY:"eyJ...tu clave anon...",
-  PAGO_ONLINE:false,   // se activa en el paso 7
-  PAGO_PRUEBAS:true
-};
-```
-
-### Paso 4 · Crear el usuario administrador
-1. **Authentication** > **Users** > **Add user** > **Create new user**: correo y contraseña, marca **Auto Confirm User**.
-2. En **SQL Editor** ejecuta (cambia el correo por el tuyo):
-
-```sql
-insert into public.admins (user_id)
-select id from auth.users where email = 'tu-correo@ejemplo.cl';
-```
-
-Solo quienes estén en `admins` entran al panel. Para otra persona, repite con su correo.
-
-### Paso 5 · Cerrar los registros públicos
-**Authentication** > **Sign In / Providers** > **Email**: desactiva **Allow new users to sign up** y guarda. (El nombre del menú puede variar un poco entre versiones.)
-
-### Paso 6 · Publicar el sitio
-Sube **toda la carpeta** a una opción gratuita:
-- **Netlify:** https://app.netlify.com/drop y arrastra la carpeta.
-- **Cloudflare Pages:** *Workers & Pages* > *Create* > *Pages* > *Upload assets*.
-- **GitHub Pages:** sube la carpeta a un repositorio y activa Pages.
-
-Anota la dirección final (por ejemplo `https://divertikids.netlify.app`). En Supabase, **Authentication** > **URL Configuration**, ponla en **Site URL**.
-
-Con esto ya funciona todo, y las reservas nuevas quedan **pendientes** para que el equipo valide el abono a mano. Para cobrar en línea, sigue el paso 7.
+Si abres `index.html` directamente (sin el servidor), todo funciona en **modo demo**: los datos se guardan solo en ese navegador y el pago es simulado. En `admin.html` entras con **admin@divertikids.cl** y clave **admin1234** (solo es un trámite de la demo, no protege nada).
 
 ---
 
-## Paso 7 · Cobrar en línea con Flow (modo pruebas primero)
+## Publicar en Railway (hosting + base de datos)
 
-Flow (https://www.flow.cl) procesa tarjetas y otros medios en Chile. El pago **no puede hacerse solo desde el navegador** porque exige una clave secreta, por eso se usan 3 funciones de servidor incluidas en `supabase/functions/`.
+Railway aloja el servidor y la base de datos PostgreSQL en el mismo proyecto. **Tiene costo:** el plan Hobby incluye un crédito de uso mensual y cobra el uso adicional. Revisa el precio vigente en https://railway.com/pricing antes de contratarlo.
 
-**Cómo funciona:** el cliente reserva y su cupo queda guardado **30 minutos** (estado `por_pagar`) > lo llevamos a Flow > Flow avisa a nuestro servidor > el servidor consulta a Flow el estado real del pago y, solo si está pagado y el monto coincide, pasa la reserva a `confirmada`. Si no paga en 30 minutos, el cupo se libera solo. El monto lo calcula el servidor; el navegador nunca lo decide.
+### Paso 1 · Cuenta
+1. Entra a **https://railway.com** e inicia sesión con la cuenta de **GitHub** donde está el repositorio del sitio.
+2. Activa el plan **Hobby** con el medio de pago de la empresa.
 
-### 7.1 · Cuenta de pruebas en Flow
-1. Crea una cuenta en **https://sandbox.flow.cl** (ambiente de pruebas, no cobra dinero).
-2. Obtén tu **API Key** y tu **Secret Key** de pruebas (ver "Credenciales de prueba" en https://developers.flow.cl). Son dos textos largos; la Secret Key **no se comparte con nadie ni va en `config.js`**.
+### Paso 2 · Crear el proyecto desde GitHub
+1. **New Project** > **Deploy from GitHub repo**.
+2. Elige el repositorio del sitio (por ejemplo `avance-azapa`). Si no aparece, da permiso a Railway para ver ese repositorio (es privado).
+3. Railway detecta `package.json` e instala y arranca el servidor solo (`npm start`). El primer intento va a fallar porque aún falta la base de datos: es normal.
 
-### 7.2 · Publicar las 3 funciones (elige una forma)
+### Paso 3 · Agregar la base de datos
+1. En el mismo proyecto: **+ New** (o **Create**) > **Database** > **PostgreSQL**.
+2. Espera a que quede en verde.
 
-**Forma A, desde la web de Supabase (sin instalar nada):**
-1. **Edge Functions** > **Deploy a new function** > **Via Editor**.
-2. Nombre exacto `flow-crear-pago`; pega el contenido de `supabase/functions/flow-crear-pago/index.ts` y **Deploy**.
-3. Repite con `flow-confirmacion` y `flow-retorno`.
-4. En estas dos últimas, desactiva **Verify JWT** / **Enforce JWT verification** (en los ajustes de cada función), porque las llama Flow y el navegador sin sesión. Deja activado en `flow-crear-pago`.
+### Paso 4 · Variables del servidor
+Entra al servicio del sitio (no al de PostgreSQL) > **Variables** y agrega:
 
-**Forma B, con la terminal** (necesita Node.js; desde la carpeta del sitio):
-```
-npx supabase login
-npx supabase link --project-ref TU_REFERENCIA
-npx supabase functions deploy flow-crear-pago
-npx supabase functions deploy flow-confirmacion --no-verify-jwt
-npx supabase functions deploy flow-retorno --no-verify-jwt
-```
-(La "referencia" es el texto de `https://TU_REFERENCIA.supabase.co`.)
-
-### 7.3 · Guardar las claves como secretos
-En **Edge Functions** > **Secrets** (o con `npx supabase secrets set NOMBRE=valor`) crea:
-
-| Secreto | Valor |
+| Variable | Valor |
 |---|---|
-| `FLOW_API_KEY` | tu API Key de pruebas de Flow |
-| `FLOW_SECRET_KEY` | tu Secret Key de pruebas de Flow |
-| `SITE_URL` | la dirección de tu sitio **sin** `/` al final, ej. `https://divertikids.netlify.app` |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (es una referencia a la base del paso 3; si tu base tiene otro nombre, cámbialo) |
+| `ADMIN_EMAIL` | el correo con que entrarás al panel |
+| `ADMIN_PASSWORD` | una clave de **al menos 10 caracteres**. Para cambiarla más adelante, cambia esta variable: al reiniciar, la clave anterior deja de servir y se cierran las sesiones abiertas. |
+
+Guarda: Railway vuelve a desplegar. Al arrancar, el servidor **crea las tablas solo** (`schema.sql`) con los 11 servicios de ejemplo; no hay que pegar SQL a mano.
+
+### Paso 5 · Dirección pública
+1. Servicio del sitio > **Settings** > **Networking** > **Generate Domain**. Railway entrega una dirección como `https://algo.up.railway.app`.
+2. Comprueba que funciona: abre `https://tu-direccion/api/salud`; debe decir `{"ok":true}`.
+3. Abre `https://tu-direccion/admin.html` y entra con `ADMIN_EMAIL` y `ADMIN_PASSWORD`. Arriba debe decir **Base de datos conectada**.
+4. (Opcional) Si la empresa tiene un dominio propio, agrégalo en la misma sección y crea la variable `SITE_URL` con esa dirección, **sin** `/` al final.
+
+Con esto ya funciona todo, y las reservas nuevas quedan **pendientes** para que el equipo valide el abono a mano. Para cobrar en línea, sigue el paso 6.
+
+---
+
+## Paso 6 · Cobrar en línea con Flow (modo pruebas primero)
+
+Flow (https://www.flow.cl) procesa tarjetas y otros medios en Chile. La clave secreta de Flow vive **solo en el servidor** (variables de Railway), nunca en el sitio.
+
+**Cómo funciona:** el cliente reserva y su cupo queda guardado **30 minutos** (estado `por_pagar`) > lo llevamos a Flow > Flow avisa al servidor > el servidor consulta a Flow el estado real del pago y, solo si está pagado y el monto coincide, pasa la reserva a `confirmada`. Si no paga en 30 minutos, el cupo se libera solo. El monto lo calcula el servidor; el navegador nunca lo decide.
+
+### 6.1 · Cuenta de pruebas en Flow
+1. Crea una cuenta en **https://sandbox.flow.cl** (ambiente de pruebas, no cobra dinero).
+2. Obtén tu **API Key** y tu **Secret Key** de pruebas (ver "Credenciales de prueba" en https://developers.flow.cl). La Secret Key **no se comparte con nadie**.
+
+### 6.2 · Variables en Railway
+En el servicio del sitio > **Variables**:
+
+| Variable | Valor |
+|---|---|
+| `FLOW_API_KEY` | tu API Key de pruebas |
+| `FLOW_SECRET_KEY` | tu Secret Key de pruebas |
 
 (`FLOW_API_URL` es opcional: por defecto usa el sandbox `https://sandbox.flow.cl/api`.)
 
-### 7.4 · Activar en el sitio
-En `config.js` cambia `PAGO_ONLINE:false` por `PAGO_ONLINE:true` y vuelve a subir el sitio.
+Al guardar, el sitio activa solo el botón **Ir a pagar a Flow**: no hay que editar archivos. Flow avisará los pagos a `https://tu-direccion/api/flow/confirmacion`, que el servidor ya tiene listo.
 
-### 7.5 · Probar
+### 6.3 · Probar
 1. En el sitio, agrega un servicio, completa tus datos y pulsa **Pagar abono** > **Ir a pagar a Flow**.
 2. Paga con los datos de prueba que Flow muestra en su ambiente de pruebas.
 3. Al volver verás "¡Pago recibido! Reserva R-xxxx confirmada". En `admin.html` la reserva aparece **confirmada**.
 4. Prueba también cancelar el pago en Flow: la reserva sigue `por_pagar` y se libera a los 30 minutos.
 
-### 7.6 · Pasar a pagos reales
-Pide a Flow habilitar tu cuenta comercial para producción, cambia los secretos `FLOW_API_KEY` y `FLOW_SECRET_KEY` por los reales, agrega el secreto `FLOW_API_URL` = `https://www.flow.cl/api`, y en `config.js` pon `PAGO_PRUEBAS:false` (quita el aviso de "ambiente de pruebas").
+### 6.4 · Pasar a pagos reales
+Pide a Flow habilitar tu cuenta comercial para producción y en Railway cambia `FLOW_API_KEY` y `FLOW_SECRET_KEY` por las reales y agrega `FLOW_API_URL` = `https://www.flow.cl/api`. El aviso de "ambiente de pruebas" desaparece solo.
 
-> **Importante:** la firma de las llamadas y los avisos de Flow los verifiqué con la documentación de Flow y con un Flow simulado, pero **no pude probar contra el sandbox real** (este entorno no tiene acceso). Haz el paso 7.5 antes de publicar. Los códigos de estado de pago que usa el sistema son los de Flow: 1 pendiente, 2 pagada, 3 rechazada, 4 anulada; confírmalo con tu primer pago de prueba.
+> **Importante:** la firma de las llamadas y los avisos de Flow están verificados con la documentación de Flow y con un Flow simulado, pero **no contra el sandbox real** todavía. Haz el paso 6.3 antes de publicar. Los códigos de estado de pago que usa el sistema son los de Flow: 1 pendiente, 2 pagada, 3 rechazada, 4 anulada; confírmalo con tu primer pago de prueba.
 
 ---
+
+## Actualizar el sitio
+Cada cambio que se sube a la rama `main` del repositorio en GitHub se publica solo en Railway. Si el cambio trae tablas o columnas nuevas, el servidor actualiza la base al arrancar **sin borrar datos**.
 
 ## Administrar servicios y precios (panel admin)
 En `admin.html`, sección **Agregar servicio** y **Servicios y precios**:
@@ -149,9 +118,7 @@ El panel tiene siete pestañas:
 - **Domicilio:** zonas y precios de despacho, y los pedidos a domicilio próximos con los datos del lugar y sus alertas (ver «Arriendo a domicilio» más abajo).
 - **Servicios y terreno:** el catálogo y el editor del terreno.
 
-**Importante al actualizar una base ya creada:** vuelve a pegar el `schema.sql` completo en Supabase (es seguro repetirlo). Agrega los datos del niño a las reservas y las tablas de clientes, ofertas y propuestas.
-
-**Datos personales:** el sitio pide el nombre y la fecha de nacimiento del niño y una casilla de aceptación para guardarlos. Los datos solo los ve el equipo con sesión iniciada. Si un apoderado pide que borren sus datos, hazlo desde Supabase (tabla *reservas* o *clientes_extra*). Conviene revisar con alguien de confianza el aviso de privacidad según la Ley 19.628 (y la Ley 21.719, que la reemplaza).
+**Datos personales:** el sitio pide el nombre y la fecha de nacimiento del niño y una casilla de aceptación para guardarlos. Los datos solo los ve el equipo con sesión iniciada en el panel. Si un apoderado pide que borren sus datos, hay que eliminarlos en la base de datos de Railway (tablas *reservas* o *clientes_extra*); pídeselo a quien administre el sistema. Conviene revisar con alguien de confianza el aviso de privacidad según la Ley 19.628 (y la Ley 21.719, que la reemplaza).
 
 **Sobre el "agente" de cumpleaños:** el envío automático de WhatsApp sin que nadie pulse un botón solo existe con la API oficial de WhatsApp Business, que tiene costo. Por eso el panel deja el mensaje listo para enviarlo con un clic. Si más adelante quieren automatizarlo, solo hay que cambiar ese botón por una llamada a la API.
 
@@ -161,22 +128,21 @@ El panel tiene siete pestañas:
 
 El sitio ofrece dos modalidades: **En nuestra parcela** (con simulador 3D) y **En tu casa o local**. En domicilio el cliente elige servicios con cantidades, la zona de despacho y llena los datos del lugar: tipo de lugar, tipo de suelo, ancho × largo, altura libre, acceso, piso, terreno plano o con pendiente, enchufe de 220 V, agua y observaciones.
 
-1. **Actualiza la base de datos**: vuelve a pegar `schema.sql` completo en el SQL Editor de Supabase y ejecútalo (es seguro repetirlo).
-2. **Zonas y precios de despacho**: panel admin → pestaña **Domicilio**. Los precios iniciales (Arica urbana, Azapa, Lluta) son **ejemplos**: cámbialos por tus tarifas reales. El servidor calcula el flete; el cliente no puede alterarlo.
-3. **Servicios solo de parcela**: en la pestaña *Servicios y terreno*, desmarca "Disponible a domicilio" en lo que no se pueda llevar (piscina, quincho, etc.).
-4. **Bloqueos por tipo**: al bloquear una fecha elige si aplica a todo, solo parcela o solo domicilio.
-5. **Stock compartido**: las unidades de un juego se comparten entre parcela y domicilio el mismo día. Un pedido a domicilio no ocupa la parcela.
-6. **Alertas**: el sitio avisa si los servicios no caben en el espacio indicado, si falta enchufe, si hay pendiente o acceso angosto. Solo impide reservar cuando físicamente no caben; el resto son avisos para que tú confirmes con el cliente. Los datos del lugar se ven en cada reserva y en la pestaña Domicilio.
+1. **Zonas y precios de despacho**: panel admin → pestaña **Domicilio**. Los precios iniciales (Arica urbana, Azapa, Lluta) son **ejemplos**: cámbialos por tus tarifas reales. El servidor calcula el flete; el cliente no puede alterarlo.
+2. **Servicios solo de parcela**: en la pestaña *Servicios y terreno*, desmarca "Disponible a domicilio" en lo que no se pueda llevar (piscina, quincho, etc.).
+3. **Bloqueos por tipo**: al bloquear una fecha elige si aplica a todo, solo parcela o solo domicilio.
+4. **Stock compartido**: las unidades de un juego se comparten entre parcela y domicilio el mismo día. Un pedido a domicilio no ocupa la parcela.
+5. **Alertas**: el sitio avisa si los servicios no caben en el espacio indicado, si falta enchufe, si hay pendiente o acceso angosto. Solo impide reservar cuando físicamente no caben; el resto son avisos para que tú confirmes con el cliente. Los datos del lugar se ven en cada reserva y en la pestaña Domicilio.
 
 ## Fotos y modelos 3D reales de los servicios
 
-En `admin.html` > **Agregar servicio** (o *Editar*) hay dos campos nuevos:
+En `admin.html` > **Agregar servicio** (o *Editar*) hay dos campos:
 
-- **Foto del servicio:** se muestra en el catálogo del sitio. Sirve JPG, PNG o WebP; la página la reduce sola a un tamaño liviano. Funciona también en modo demo.
-- **Modelo 3D real (.glb):** reemplaza la figura simple del simulador por el modelo de verdad. Se ajusta solo al **ancho y largo reales** que escribiste (sin deformarse) y se apoya en el suelo. Si queda de lado, usa **Girar el modelo** (90°, 180° o 270°). Si el modelo falla al cargar, el simulador usa la figura simple y no se rompe nada.
-  Requiere la base de datos real (Supabase); en modo demo el campo aparece bloqueado.
+- **Foto del servicio:** se muestra en el catálogo del sitio. Sirve JPG, PNG o WebP (hasta 5 MB); la página la reduce sola a un tamaño liviano. Funciona también en modo demo.
+- **Modelo 3D real (.glb):** reemplaza la figura simple del simulador por el modelo de verdad (hasta 30 MB). Se ajusta solo al **ancho y largo reales** que escribiste (sin deformarse) y se apoya en el suelo. Si queda de lado, usa **Girar el modelo** (90°, 180° o 270°). Si el modelo falla al cargar, el simulador usa la figura simple y no se rompe nada.
+  Requiere el servidor con base de datos (Railway); en modo demo el campo aparece bloqueado.
 
-**Importante si ya habías instalado una versión anterior:** vuelve a ejecutar `schema.sql` completo (Supabase > SQL Editor > Run). Agrega las columnas y las carpetas de archivos `servicios` y `modelos` sin borrar tus datos.
+Las fotos y los modelos se guardan **en la base de datos** y el servidor los entrega en `/archivos/...`, así que se respaldan junto con los demás datos.
 
 ### Cómo conseguir modelos 3D que se parezcan a tus juegos
 El simulador no puede "adivinar" cómo es tu castillo o tu tobogán: necesita un modelo 3D. Tres caminos, del más fiel al más rápido:
@@ -187,7 +153,7 @@ El simulador no puede "adivinar" cómo es tu castillo o tu tobogán: necesita un
 Consejos: el archivo debe ser `.glb` (no `.obj`, `.fbx` ni `.gltf` suelto); ideal menos de **10 MB** (máximo permitido 30 MB) porque en el celular carga por internet móvil. Si pesa mucho, se puede reducir gratis en la página gltf.report. Si tienes Blender: *File > Export > glTF 2.0 > formato "glb"*.
 
 ## El terreno (parcela) en el simulador
-En el panel de administración, sección **Terreno**, puedes dejar el simulador igual a tu parcela real. Se guarda en la base (tabla `terreno`) y lo ven todos los clientes. **Si ya tenías el proyecto armado, vuelve a pegar `schema.sql` completo en el SQL Editor de Supabase** (es seguro repetirlo): crea la tabla `terreno`.
+En el panel de administración, sección **Terreno**, puedes dejar el simulador igual a tu parcela real. Se guarda en la base (tabla `terreno`) y lo ven todos los clientes.
 
 **Qué puedes configurar**
 - **Medidas:** ancho y largo en metros (de 8 a 80 y de 6 a 60). El precio de la parcela y las medidas que ve el cliente se actualizan solos.
@@ -203,7 +169,7 @@ En el panel de administración, sección **Terreno**, puedes dejar el simulador 
 2. **Foto aérea:** una foto tomada desde arriba (dron, o captura de satélite de Google Maps) que se estira sobre el suelo. Recórtala justo en los bordes del terreno, con **la parte de arriba de la foto = el fondo de la parcela y la parte de abajo = la entrada**. Si queda al revés, gírala antes de subirla. Es la forma más fiel sin 3D.
 3. **Escaneo 3D (.glb):** con el video de la parcela, una app como Polycam, Luma AI o Kiri Engine arma un modelo que se exporta como `.glb` (menos de 30 MB, ideal menos de 10). Al subirlo reemplaza al terreno dibujado y se ajusta solo a las medidas que pusiste; el campo de giro sirve si queda de lado. Si no carga, el sitio sigue mostrando el terreno dibujado.
 
-**Importante:** en modo demo (sin base de datos) la foto aérea sí se guarda, pero el archivo 3D del terreno solo se puede subir con la base conectada.
+**Importante:** en modo demo (sin servidor) la foto aérea sí se guarda, pero el archivo 3D del terreno solo se puede subir con el servidor y la base conectados.
 
 ## Chatbot
 Responde **28 temas** (precios, disponibilidad por fecha, ubicación, horarios, pagos, cancelaciones, montaje, etc.) y deriva a una persona por WhatsApp.
@@ -211,26 +177,33 @@ Responde **28 temas** (precios, disponibilidad por fecha, ubicación, horarios, 
 - **Prueba de calidad:** `pruebas/chatbot.test.mjs` lanza 30 consultas y mide el % de aciertos (resultado en `pruebas/resultados-chatbot.md`). Las 30 consultas iniciales las escribí yo, así que **agrega las que de verdad hace tu gente** (están al inicio del archivo) y vuelve a medir.
 
 ## Pruebas automáticas (opcional, para quien programe)
-Necesitan Node.js 22 y Playwright (`npm i playwright`):
+Necesitan Node.js 20 o superior, Playwright con Chromium y PGlite (PostgreSQL en memoria, para probar el servidor sin Railway):
 ```
-node --experimental-strip-types pruebas/flow-mock.test.mjs   # funciones de pago contra un Flow simulado
-node pruebas/chatbot.test.mjs                                # 30 consultas del chatbot
-node pruebas/ajuste-modelo.test.mjs                          # cómo se ajusta un modelo 3D real al ancho y largo
-node pruebas/sitio-demo.test.mjs                             # recorrido completo en modo demo
-node pruebas/sitio-flow.test.mjs                             # recorrido con pago en línea (base simulada)
-node pruebas/terreno.test.mjs                                # editor del terreno, guardado y uso en el sitio
-node pruebas/parcela-diverti.test.mjs                        # botón "Cargar mi parcela"
-node pruebas/texturas.test.mjs                               # texturas y sólido/intangible
-node pruebas/domicilio.test.mjs                              # modalidad domicilio, lugar, zonas y flete
-node pruebas/cartera.test.mjs                                # clientes, cumpleaños, balance, Excel, ofertas y redes
-node pruebas/terreno-3d.test.mjs                             # qué se dibuja en el 3D según el terreno (con 3D simulado)
+npm i --no-save playwright @electric-sql/pglite
 ```
+```
+node pruebas/servidor.test.mjs          # servidor: sitio, reservas, seguridad del panel, archivos (base PostgreSQL en memoria)
+node pruebas/flow-mock.test.mjs         # pago del abono con Flow a través del servidor (Flow simulado)
+node pruebas/sitio-flow.test.mjs        # recorrido en el navegador con el servidor: pagar en Flow, volver y usar el panel
+node pruebas/chatbot.test.mjs           # 30 consultas del chatbot
+node pruebas/ajuste-modelo.test.mjs     # cómo se ajusta un modelo 3D real al ancho y largo
+node pruebas/sitio-demo.test.mjs        # recorrido completo en modo demo
+node pruebas/terreno.test.mjs           # editor del terreno, guardado y uso en el sitio
+node pruebas/parcela-diverti.test.mjs   # botón "Cargar mi parcela"
+node pruebas/texturas.test.mjs          # texturas y sólido/intangible
+node pruebas/domicilio.test.mjs         # modalidad domicilio, lugar, zonas y flete
+node pruebas/cartera.test.mjs           # clientes, cumpleaños, balance, Excel, ofertas y redes
+node pruebas/terreno-3d.test.mjs        # qué se dibuja en el 3D según el terreno (con 3D simulado)
+```
+Si Chromium no está en `/opt/pw-browsers/chromium`, indica tu navegador con la variable `CHROMIUM` (por ejemplo, la ruta de Google Chrome).
 
 ## Cómo funciona la seguridad
+- El navegador **nunca se conecta a la base de datos**: todo pasa por el servidor, que solo acepta las operaciones previstas.
 - Los clientes **no pueden leer** reservas ni datos de otras personas; solo ven qué está ocupado.
-- Al reservar, el **servidor recalcula el precio y revisa la disponibilidad**; si alguien manipula el navegador, la base lo rechaza.
+- Al reservar, la **base recalcula el precio y revisa la disponibilidad**; si alguien manipula el navegador, se rechaza.
 - El pago solo lo confirma el servidor tras consultar a Flow; el navegador no puede marcar una reserva como pagada.
-- El panel solo muestra datos a usuarios de la tabla `admins`.
+- El panel exige iniciar sesión. La clave se guarda cifrada (scrypt), la sesión vive en una cookie protegida (HttpOnly, SameSite) y vence en 12 horas, y tras 8 intentos fallidos el login se bloquea 15 minutos.
+- Las fotos y modelos se revisan por su contenido real (JPG, PNG, WebP o .glb) antes de guardarse.
 
 ## Instalar como app en el celular
 - **iPhone (Safari):** Compartir > **Agregar a pantalla de inicio**.
@@ -239,14 +212,16 @@ node pruebas/terreno-3d.test.mjs                             # qué se dibuja en
 ## Si algo falla
 | Síntoma | Qué revisar |
 |---|---|
-| "No se pudo conectar con la base de datos" | `config.js` con URL y clave anon completas; que hayas corrido `schema.sql`. |
-| "Este usuario no tiene permisos de administración" | Falta el paso 4.2 (insertar el correo en `admins`). |
-| Al pagar dice "No se pudo iniciar el pago" | Revisa los 3 secretos del 7.3 y que `flow-crear-pago` esté publicada. Mira los registros en Edge Functions > *Logs*. |
-| Pagué en Flow pero sigue "por_pagar" | `flow-confirmacion` debe tener **Verify JWT desactivado** y `SITE_URL`/claves correctas; Flow reintenta el aviso. |
+| El despliegue falla con "Falta la variable DATABASE_URL" | Paso 4: falta `DATABASE_URL` o la referencia apunta a otro nombre de base. |
+| El servidor no arranca: "ADMIN_PASSWORD debe tener al menos 10 caracteres" | Usa una clave más larga en `ADMIN_PASSWORD`. |
+| "No se pudo conectar con el servidor" | Revisa en Railway que el servicio esté activo (en verde) y mira sus registros (*Deployments* > *View logs*). |
+| "Correo o contraseña incorrectos" en el panel | Usa exactamente `ADMIN_EMAIL` y `ADMIN_PASSWORD` de Railway. |
+| Al pagar dice "No se pudo iniciar el pago" | Revisa `FLOW_API_KEY` y `FLOW_SECRET_KEY` (y `FLOW_API_URL` si estás en producción). Mira los registros del servicio en Railway. |
+| Pagué en Flow pero sigue "por_pagar" | Flow debe poder llegar a `https://tu-direccion/api/flow/confirmacion`; si usas dominio propio, revisa `SITE_URL`. Flow reintenta el aviso. |
 | "El plazo para pagar venció" | Pasaron más de 30 minutos; hay que reservar de nuevo. |
 | Una reserva quedó "pendiente" con una nota en rojo | Flow cobró un monto distinto o el cupo se perdió: revísala en el panel (y reembolsa si corresponde). |
 | El simulador 3D no aparece | Falta internet para cargar la librería 3D; el resto del sitio y el pago siguen funcionando. |
-| Quiero ver errores | En el navegador: F12 > pestaña **Consola**. |
+| Quiero ver errores | En el navegador: F12 > pestaña **Consola**. En el servidor: registros del servicio en Railway. |
 
 ## Respaldo de los datos
-Supabase: **Table Editor** > `reservas` > **Export** a CSV. En el plan gratuito, hazlo cada cierto tiempo.
+Descarga cada cierto tiempo los Excel del panel (pestañas *Clientes* y *Balance*). Además, revisa en Railway qué respaldos automáticos ofrece la base PostgreSQL en el plan contratado (Por verificar).

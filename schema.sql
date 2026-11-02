@@ -1,7 +1,8 @@
 -- =====================================================================
--- Divertí Kids · esquema de base de datos para Supabase (PostgreSQL)
--- Pégalo completo en Supabase > SQL Editor > New query > Run.
--- Se puede ejecutar más de una vez (también sobre una versión anterior) sin perder datos.
+-- Divertí Kids · esquema de la base de datos (PostgreSQL de Railway)
+-- El servidor (server/index.mjs) lo ejecuta solo cada vez que arranca:
+-- no hay que pegarlo a mano. Se puede ejecutar muchas veces sin perder datos.
+-- La seguridad la aplica el servidor: el navegador nunca se conecta a la base.
 -- =====================================================================
 
 -- ---------- Tablas ----------
@@ -25,6 +26,14 @@ alter table public.catalogo add column if not exists forma      text    not null
 alter table public.catalogo add column if not exists activo     boolean not null default true;
 alter table public.catalogo add column if not exists domicilio  boolean not null default true;   -- ¿se arrienda también fuera de la parcela?
 alter table public.catalogo add column if not exists orden      integer not null default 100;
+alter table public.catalogo add column if not exists imagen     text;                -- dirección de la foto (/archivos/...)
+alter table public.catalogo add column if not exists modelo3d   text;                -- dirección del modelo .glb (/archivos/...)
+alter table public.catalogo add column if not exists modelo_rot integer not null default 0;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'catalogo_modelo_rot_chk') then
+    alter table public.catalogo add constraint catalogo_modelo_rot_chk check (modelo_rot in (0,90,180,270));
+  end if;
+end $$;
 
 create table if not exists public.fechas_bloqueadas (
   fecha  date primary key,
@@ -80,9 +89,28 @@ alter table public.reservas add  constraint reservas_estado_check
   check (estado in ('por_pagar','pendiente','confirmada','finalizada','cancelada'));
 create index if not exists reservas_fecha_idx on public.reservas (fecha, franja);
 
--- Quiénes son administradores (usuarios de Supabase Auth)
+-- ---------- Acceso al panel de administración ----------
+-- Administradores: la clave se guarda cifrada (scrypt). El servidor crea o actualiza
+-- el administrador indicado en las variables ADMIN_EMAIL y ADMIN_PASSWORD.
 create table if not exists public.admins (
-  user_id uuid primary key references auth.users(id) on delete cascade
+  email      text primary key check (email = lower(email) and email ~ '^\S+@\S+\.\S+$'),
+  clave_hash text not null,
+  creado     timestamptz not null default now()
+);
+-- Sesiones abiertas del panel (se guarda solo un resumen del código de la sesión, nunca el código)
+create table if not exists public.sesiones (
+  token_hash text primary key,
+  email      text not null references public.admins(email) on delete cascade,
+  expira     timestamptz not null
+);
+create index if not exists sesiones_expira_idx on public.sesiones (expira);
+
+-- ---------- Fotos y modelos 3D (se guardan en la base y se sirven en /archivos/<id>) ----------
+create table if not exists public.archivos (
+  id     text primary key check (id ~ '^[a-z0-9-]{3,80}\.(jpg|png|webp|glb)$'),
+  tipo   text not null,                               -- image/jpeg, image/png, image/webp o model/gltf-binary
+  datos  bytea not null,
+  creado timestamptz not null default now()
 );
 
 -- ---------- Catálogo inicial ----------
@@ -103,12 +131,7 @@ on conflict (item_id) do update set
   alto = excluded.alto, color = excluded.color, color_tope = excluded.color_tope, forma = excluded.forma, orden = excluded.orden
   where public.catalogo.descripcion is null;   -- solo completa filas de una versión anterior; no pisa lo que editaste
 
--- ---------- Funciones auxiliares ----------
-create or replace function public.es_admin()
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.admins where user_id = auth.uid());
-$$;
-
+-- ---------- Funciones del negocio ----------
 -- ¿la reserva ocupa cupo? (las "por_pagar" lo ocupan solo hasta que vence su plazo)
 create or replace function public.reserva_vigente(p_estado text, p_expira timestamptz)
 returns boolean language sql stable as $$
@@ -119,18 +142,15 @@ $$;
 -- Disponibilidad pública: solo fecha, franja y qué se arrendó. SIN datos de clientes.
 create or replace function public.disponibilidad()
 returns table (fecha date, franja text, items jsonb, parcela boolean)
-language sql stable security definer set search_path = public as $$
+language sql stable as $$
   select r.fecha, r.franja, r.items, r.parcela
   from public.reservas r
   where public.reserva_vigente(r.estado, r.expira) and r.fecha >= current_date;
 $$;
 
--- Crear reserva: el servidor recalcula precios y valida disponibilidad (no confía en el navegador).
+-- Crear reserva: la base recalcula precios y valida disponibilidad (no confía en el navegador).
 -- p_online = true  -> queda "por_pagar" (30 min de plazo) y se paga en Flow
 -- p_online = false -> queda "pendiente" y el equipo valida el abono a mano
-drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text);
-drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean);
-drop function if exists public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean);
 create or replace function public.crear_reserva(
   p_fecha date, p_franja text, p_nombre text, p_email text, p_telefono text,
   p_invitados integer, p_items jsonb, p_parcela boolean, p_layout jsonb,
@@ -138,7 +158,7 @@ create or replace function public.crear_reserva(
   p_nino text default null, p_nacimiento date default null, p_acepta boolean default false,
   p_modalidad text default 'parcela', p_lugar jsonb default null, p_zona text default null
 ) returns jsonb
-language plpgsql security definer set search_path = public as $$
+language plpgsql as $$
 declare
   v_total integer := 0; v_abono integer; v_folio text; v_codigo text; v_estado text;
   v_key text; v_qty integer; v_cat public.catalogo%rowtype; v_usado integer;
@@ -223,7 +243,7 @@ $$;
 
 -- Estado de una reserva para la pantalla de retorno del pago (exige folio + código secreto)
 create or replace function public.estado_reserva(p_folio text, p_codigo text)
-returns jsonb language sql stable security definer set search_path = public as $$
+returns jsonb language sql stable as $$
   select coalesce((
     select jsonb_build_object(
       'folio', r.folio, 'fecha', r.fecha, 'franja', r.franja, 'total', r.total, 'abono', r.abono,
@@ -231,10 +251,10 @@ returns jsonb language sql stable security definer set search_path = public as $
     from public.reservas r where r.folio = p_folio and r.codigo = p_codigo), 'null'::jsonb);
 $$;
 
--- Lo llaman SOLO las funciones de servidor (Edge Functions) cuando Flow informa el resultado de un pago.
+-- La llama SOLO el servidor cuando Flow informa el resultado de un pago (después de consultarlo a Flow).
 -- p_status de Flow: 1 = pendiente de pago, 2 = pagada, 3 = rechazada, 4 = anulada
 create or replace function public.marcar_pago(p_folio text, p_status integer, p_flow_orden bigint, p_monto integer)
-returns text language plpgsql security definer set search_path = public as $$
+returns text language plpgsql as $$
 declare r public.reservas%rowtype;
 begin
   select * into r from public.reservas where folio = p_folio for update;
@@ -266,75 +286,6 @@ begin
 end;
 $$;
 
--- ---------- Seguridad (Row Level Security) ----------
-alter table public.reservas          enable row level security;
-alter table public.catalogo          enable row level security;
-alter table public.fechas_bloqueadas enable row level security;
-alter table public.admins            enable row level security;   -- sin políticas: nadie la lee por la API
-
-drop policy if exists "admin gestiona reservas" on public.reservas;
-create policy "admin gestiona reservas" on public.reservas
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
-
-drop policy if exists "todos ven el catalogo" on public.catalogo;
-drop policy if exists "admin edita el catalogo" on public.catalogo;
-drop policy if exists "publico ve servicios activos" on public.catalogo;
-create policy "publico ve servicios activos" on public.catalogo for select to anon, authenticated using (activo);
-drop policy if exists "admin gestiona el catalogo" on public.catalogo;
-create policy "admin gestiona el catalogo" on public.catalogo
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
-
-drop policy if exists "todos ven fechas bloqueadas" on public.fechas_bloqueadas;
-create policy "todos ven fechas bloqueadas" on public.fechas_bloqueadas for select to anon, authenticated using (true);
-drop policy if exists "admin gestiona bloqueos" on public.fechas_bloqueadas;
-create policy "admin gestiona bloqueos" on public.fechas_bloqueadas
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
-
--- Permisos de ejecución de las funciones
-revoke all on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean,text,jsonb,text) from public;
-grant execute on function public.crear_reserva(date,text,text,text,text,integer,jsonb,boolean,jsonb,text,text,boolean,text,date,boolean,text,jsonb,text) to anon, authenticated;
-revoke all on function public.disponibilidad() from public;
-grant execute on function public.disponibilidad() to anon, authenticated;
-revoke all on function public.es_admin() from public;
-grant execute on function public.es_admin() to anon, authenticated;
-revoke all on function public.estado_reserva(text,text) from public;
-grant execute on function public.estado_reserva(text,text) to anon, authenticated;
-revoke all on function public.reserva_vigente(text,timestamptz) from public;
-grant execute on function public.reserva_vigente(text,timestamptz) to anon, authenticated;
-revoke all on function public.marcar_pago(text,integer,bigint,integer) from public, anon, authenticated;
-grant execute on function public.marcar_pago(text,integer,bigint,integer) to service_role;
-
--- ---------- Fotos y modelos 3D de los servicios ----------
-alter table public.catalogo add column if not exists imagen text;                -- dirección pública de la foto
-alter table public.catalogo add column if not exists modelo3d text;              -- dirección pública del modelo .glb
-alter table public.catalogo add column if not exists modelo_rot integer not null default 0;
-do $$ begin
-  if not exists (select 1 from pg_constraint where conname = 'catalogo_modelo_rot_chk') then
-    alter table public.catalogo add constraint catalogo_modelo_rot_chk check (modelo_rot in (0,90,180,270));
-  end if;
-end $$;
-
--- Carpetas de archivos (Storage): fotos hasta 5 MB y modelos hasta 30 MB. Se leen en público.
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
-  ('servicios', 'servicios', true, 5242880,  array['image/jpeg','image/png','image/webp']),
-  ('modelos',   'modelos',   true, 31457280, null)
-on conflict (id) do update set public = excluded.public,
-  file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
-
-drop policy if exists "dk ver archivos" on storage.objects;
-create policy "dk ver archivos" on storage.objects for select to anon, authenticated
-  using (bucket_id in ('servicios','modelos'));
-drop policy if exists "dk admin sube archivos" on storage.objects;
-create policy "dk admin sube archivos" on storage.objects for insert to authenticated
-  with check (bucket_id in ('servicios','modelos') and public.es_admin());
-drop policy if exists "dk admin cambia archivos" on storage.objects;
-create policy "dk admin cambia archivos" on storage.objects for update to authenticated
-  using (bucket_id in ('servicios','modelos') and public.es_admin())
-  with check (bucket_id in ('servicios','modelos') and public.es_admin());
-drop policy if exists "dk admin borra archivos" on storage.objects;
-create policy "dk admin borra archivos" on storage.objects for delete to authenticated
-  using (bucket_id in ('servicios','modelos') and public.es_admin());
-
 -- ---------- Terreno (la parcela del simulador 3D) ----------
 create table if not exists public.terreno (
   id         integer primary key default 1 check (id = 1),          -- una sola fila
@@ -342,7 +293,7 @@ create table if not exists public.terreno (
   largo      numeric not null default 20 check (largo between 6 and 60),
   suelo      text    not null default 'pasto' check (suelo in ('pasto','tierra','cemento','arena')),
   cerco      boolean not null default true,
-  foto       text,                                                    -- foto aérea (dirección pública)
+  foto       text,                                                    -- foto aérea (/archivos/...)
   modelo3d   text,                                                    -- modelo .glb del terreno (escaneo)
   modelo_rot integer not null default 0 check (modelo_rot in (0,90,180,270)),
   elementos  jsonb   not null default '[]'::jsonb
@@ -355,13 +306,6 @@ insert into public.terreno (id, elementos) values (1, '[
   {"id":"a2","t":"arbol","name":"Árbol","x":-12.5,"z":6,"w":1.6,"d":1.6,"rot":0},
   {"id":"a3","t":"arbol","name":"Árbol","x":9,"z":8.3,"w":1.6,"d":1.6,"rot":0}]'::jsonb)
 on conflict (id) do nothing;
-
-alter table public.terreno enable row level security;
-drop policy if exists "todos ven el terreno" on public.terreno;
-create policy "todos ven el terreno" on public.terreno for select to anon, authenticated using (true);
-drop policy if exists "admin gestiona el terreno" on public.terreno;
-create policy "admin gestiona el terreno" on public.terreno
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 
 -- ---------- Cartera de clientes, ofertas y propuestas de cumpleaños ----------
@@ -379,10 +323,6 @@ create table if not exists public.clientes_extra (
   notas       text,
   creado      timestamptz not null default now()
 );
-alter table public.clientes_extra enable row level security;
-drop policy if exists "admin gestiona clientes" on public.clientes_extra;
-create policy "admin gestiona clientes" on public.clientes_extra
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 -- Tablón de ofertas (se muestran en el sitio mientras estén activas y no hayan vencido)
 create table if not exists public.ofertas (
@@ -393,23 +333,12 @@ create table if not exists public.ofertas (
   activa  boolean not null default true,
   creada  timestamptz not null default now()
 );
-alter table public.ofertas enable row level security;
-drop policy if exists "publico ve ofertas vigentes" on public.ofertas;
-create policy "publico ve ofertas vigentes" on public.ofertas for select to anon, authenticated
-  using (activa and (hasta is null or hasta >= current_date));
-drop policy if exists "admin gestiona ofertas" on public.ofertas;
-create policy "admin gestiona ofertas" on public.ofertas
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 -- Registro de propuestas de cumpleaños ya enviadas (una por niño y año)
 create table if not exists public.propuestas (
   clave   text primary key,       -- "celular|niño|año"
   enviada timestamptz not null default now()
 );
-alter table public.propuestas enable row level security;
-drop policy if exists "admin gestiona propuestas" on public.propuestas;
-create policy "admin gestiona propuestas" on public.propuestas
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());
 
 
 -- ---------- Arriendo a domicilio: zonas de despacho ----------
@@ -426,9 +355,3 @@ insert into public.zonas_despacho (id, nombre, precio, orden) values
   ('azapa',  'Valle de Azapa y alrededores', 15000, 20),
   ('lluta',  'Valle de Lluta y Poconchile',  25000, 30)
 on conflict (id) do nothing;
-alter table public.zonas_despacho enable row level security;
-drop policy if exists "publico ve zonas activas" on public.zonas_despacho;
-create policy "publico ve zonas activas" on public.zonas_despacho for select to anon, authenticated using (activa);
-drop policy if exists "admin gestiona zonas" on public.zonas_despacho;
-create policy "admin gestiona zonas" on public.zonas_despacho
-  for all to authenticated using (public.es_admin()) with check (public.es_admin());

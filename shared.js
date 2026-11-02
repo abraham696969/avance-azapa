@@ -1,6 +1,6 @@
 /* Divertí Kids · capa compartida (catálogo, utilidades y acceso a datos)
-   Si config.js tiene las claves de Supabase, los datos viven en la base de datos.
-   Si no, funciona en MODO DEMO guardando todo en el navegador (localStorage). */
+   Si el sitio lo entrega el servidor de Railway (server/index.mjs), los datos viven en su base PostgreSQL.
+   Si no (por ejemplo, abriendo los archivos sueltos), funciona en MODO DEMO guardando todo en el navegador (localStorage). */
 (function(){
 'use strict';
 const $=s=>document.querySelector(s)||document.createElement('div'); // nunca devuelve null
@@ -147,16 +147,22 @@ function fitGLB(min,max,rotDeg,w,d){
 
 /* ============ Acceso a datos ============ */
 const cfg=window.DK_CONFIG||{};
-const LIVE=!!(cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY);
+const LIVE=!!cfg.SERVIDOR;   // lo activa el servidor de Railway al entregar config.js; sin servidor = modo demo
 const DEMO_USER='admin@divertikids.cl', DEMO_PASS='admin1234';
-let _sb=null;
-function sb(){
-  if(_sb)return _sb;
-  if(!window.supabase)throw new Error('No se pudo cargar la librería de Supabase. Revisa tu conexión.');
-  _sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
-  return _sb;
+/* Llamada al servidor (misma dirección del sitio). La cabecera x-dk protege los cambios del panel. */
+async function api(method,url,body){
+  const o={method,credentials:'same-origin',headers:{'x-dk':'1'}};
+  if(body!==undefined){
+    if(body instanceof Blob){o.body=body;o.headers['Content-Type']=body.type||'application/octet-stream'}
+    else{o.body=JSON.stringify(body);o.headers['Content-Type']='application/json'}
+  }
+  let r;try{r=await fetch(url,o)}catch(e){throw new Error('No se pudo conectar con el servidor. Revisa tu conexión.')}
+  const j=await r.json().catch(()=>null);
+  if(!r.ok)throw new Error((j&&j.error)||'El servidor respondió con un error ('+r.status+').');
+  return j;
 }
-const ok=r=>{if(r.error)throw new Error(r.error.message);return r.data};
+/* Cambio en una tabla desde el panel: accion = insert, update, upsert o delete */
+const adm=(tabla,accion,fila,clave)=>api('POST','/api/admin/'+tabla,{accion,fila,clave});
 
 /* ----- modo demo (localStorage) ----- */
 const DKEY='diverti-kids-demo-v2';
@@ -294,27 +300,21 @@ function siteChecks(lugar,items){
 
 const SLOT_OK=Object.keys(SLOTS);
 const API={
-  mode:LIVE?'supabase':'demo',
+  mode:LIVE?'servidor':'demo',
   online:LIVE&&!!cfg.PAGO_ONLINE,   // true = el pago se hace en Flow (ver INSTRUCCIONES.md)
   demoUser:DEMO_USER, demoPass:DEMO_PASS,
 
   /* ---------- público ---------- */
   async loadPublic(){
     if(LIVE){
-      const c=sb();
-      const [d,b,k]=await Promise.all([
-        c.rpc('disponibilidad'),
-        c.from('fechas_bloqueadas').select('fecha,motivo,aplica').gte('fecha',iso(today)),
-        c.from('catalogo').select('*')
-      ]).then(r=>r.map(ok));
-      const terrain=await c.from('terreno').select('*').eq('id',1).maybeSingle().then(r=>r.error?null:terrainFromRow(r.data),()=>null);  // si la tabla aún no existe, se usa el terreno de ejemplo
-      const ofertas=await c.from('ofertas').select('*').then(r=>r.error?[]:(r.data||[]).map(offerFromRow),()=>[]);   // si la tabla aún no existe, no hay ofertas
-      const zonas=await c.from('zonas_despacho').select('*').order('orden').then(r=>r.error?[]:(r.data||[]).map(zonaFromRow),()=>[]);
+      const d=await api('GET','/api/publico');
       return {
-        terrain,ofertas,zonas,
-        res:(d||[]).map(x=>({date:x.fecha,slot:x.franja,items:x.items||{},parcela:!!x.parcela,status:'activa'})),
-        blocked:(b||[]).map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
-        catalog:Object.fromEntries((k||[]).map(x=>[x.item_id,fromRow(x)]))
+        terrain:terrainFromRow(d.terreno),
+        ofertas:(d.ofertas||[]).map(offerFromRow),
+        zonas:(d.zonas||[]).map(zonaFromRow),
+        res:(d.disponibilidad||[]).map(x=>({date:x.fecha,slot:x.franja,items:x.items||{},parcela:!!x.parcela,status:'activa'})),
+        blocked:(d.bloqueos||[]).map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
+        catalog:Object.fromEntries((d.catalogo||[]).map(x=>[x.item_id,fromRow(x)]))
       };
     }
     const s=demoLoad();
@@ -322,12 +322,11 @@ const API={
   },
   async createReservation(p){
     if(LIVE){
-      const r=ok(await sb().rpc('crear_reserva',{
+      return await api('POST','/api/reservas',{
         p_fecha:p.date,p_franja:p.slot,p_nombre:p.client.name,p_email:p.client.email,p_telefono:p.client.phone,
         p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn,p_online:!!p.online,
         p_nino:p.client.kid,p_nacimiento:p.client.kidBirth,p_acepta:!!p.client.consent,
-        p_modalidad:p.modalidad||'parcela',p_lugar:p.lugar||null,p_zona:p.zona||null}));
-      return r;
+        p_modalidad:p.modalidad||'parcela',p_lugar:p.lugar||null,p_zona:p.zona||null});
     }
     const s=demoLoad();
     const dom=p.modalidad==='domicilio';
@@ -341,91 +340,65 @@ const API={
     return {folio,total,abono,estado:'confirmada'};
   },
 
-  /* Pide a la función de servidor la dirección de pago de Flow y devuelve la URL */
+  /* Pide al servidor la dirección de pago de Flow (el monto lo pone el servidor) y devuelve la URL */
   async startPayment(folio,codigo){
-    const {data,error}=await sb().functions.invoke('flow-crear-pago',{body:{folio,codigo}});
-    if(error){
-      let msg='No se pudo iniciar el pago. Intenta de nuevo.';
-      try{const j=await error.context.json();if(j&&j.error)msg=j.error}catch(e){}
-      throw new Error(msg);
-    }
-    if(!data||!data.url)throw new Error((data&&data.error)||'No se pudo iniciar el pago.');
-    return data.url;
+    const d=await api('POST','/api/pago',{folio,codigo});
+    if(!d||!d.url)throw new Error('No se pudo iniciar el pago.');
+    return d.url;
   },
   /* Estado de la reserva al volver de Flow (folio + código secreto que viajan en la dirección) */
   async reservationStatus(folio,codigo){
     if(!LIVE)return null;
-    return ok(await sb().rpc('estado_reserva',{p_folio:folio,p_codigo:codigo}));
+    return await api('GET','/api/reservas/estado?folio='+encodeURIComponent(folio)+'&c='+encodeURIComponent(codigo));
   },
 
   /* ---------- administración ---------- */
   async session(){
-    if(LIVE){
-      const c=sb();const {data}=await c.auth.getSession();
-      if(!data||!data.session)return null;
-      const admin=ok(await c.rpc('es_admin'));
-      if(!admin){await c.auth.signOut();return null}
-      return {email:data.session.user.email};
-    }
+    if(LIVE){const d=await api('GET','/api/sesion');return d&&d.email?{email:d.email}:null}
     try{return sessionStorage.getItem('dk-admin')?{email:DEMO_USER}:null}catch(e){return null}
   },
   async login(email,pass){
-    if(LIVE){
-      const c=sb();
-      const {error}=await c.auth.signInWithPassword({email,password:pass});
-      if(error)throw new Error(error.message==='Invalid login credentials'?'Correo o contraseña incorrectos.':error.message);
-      const admin=ok(await c.rpc('es_admin'));
-      if(!admin){await c.auth.signOut();throw new Error('Este usuario no tiene permisos de administración.')}
-      return {email};
-    }
+    if(LIVE){const d=await api('POST','/api/login',{email,clave:pass});return {email:d.email}}
     if(email.trim().toLowerCase()!==DEMO_USER||pass!==DEMO_PASS)throw new Error('Correo o contraseña incorrectos.');
     try{sessionStorage.setItem('dk-admin','1')}catch(e){}
     return {email:DEMO_USER};
   },
   async logout(){
-    if(LIVE){await sb().auth.signOut();return}
+    if(LIVE){await api('POST','/api/logout');return}
     try{sessionStorage.removeItem('dk-admin')}catch(e){}
   },
   async adminLoad(){
     if(LIVE){
-      const c=sb();
-      const [r,b,k]=await Promise.all([
-        c.from('reservas').select('*').order('fecha',{ascending:true}).order('franja',{ascending:true}),
-        c.from('fechas_bloqueadas').select('fecha,motivo,aplica').order('fecha'),
-        c.from('catalogo').select('*')
-      ]).then(x=>x.map(ok));
-      const terrain=await c.from('terreno').select('*').eq('id',1).maybeSingle().then(r=>r.error?null:terrainFromRow(r.data),()=>null);
-      const soft=(q,fn)=>q.then(r=>r.error?[]:(r.data||[]).map(fn),()=>[]);   // tablas nuevas: si aún no existen, se muestran vacías
-      const [clientes,ofertas,props]=await Promise.all([
-        soft(c.from('clientes_extra').select('*').order('id'),clienteFromRow),
-        soft(c.from('ofertas').select('*').order('id'),offerFromRow),
-        soft(c.from('propuestas').select('clave'),x=>x.clave)]);
-      const zonas=await soft(c.from('zonas_despacho').select('*').order('orden'),zonaFromRow);
+      const d=await api('GET','/api/admin/datos');
       return {
-        terrain,clientes,ofertas,propuestas:props,zonas,
-        res:r.map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||'',modalidad:x.modalidad||'parcela',lugar:x.lugar||null,flete:x.flete||0,zona:x.zona||''})),
-        blocked:b.map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
-        catalog:Object.fromEntries(k.map(x=>[x.item_id,fromRow(x)]))
+        terrain:terrainFromRow(d.terreno),
+        clientes:(d.clientes||[]).map(clienteFromRow),
+        ofertas:(d.ofertas||[]).map(offerFromRow),
+        propuestas:d.propuestas||[],
+        zonas:(d.zonas||[]).map(zonaFromRow),
+        res:(d.reservas||[]).map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||'',modalidad:x.modalidad||'parcela',lugar:x.lugar||null,flete:x.flete||0,zona:x.zona||''})),
+        blocked:(d.bloqueos||[]).map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
+        catalog:Object.fromEntries((d.catalogo||[]).map(x=>[x.item_id,fromRow(x)]))
       };
     }
     const s=demoLoad();return {terrain:s.terrain||null,res:s.res,blocked:s.blocked,catalog:s.catalog||{},clientes:s.clientes||[],ofertas:s.ofertas||[],propuestas:s.propuestas||[],zonas:s.zonas||ZONAS_DEMO};
   },
   async setStatus(folio,status){
-    if(LIVE){ok(await sb().from('reservas').update({estado:status}).eq('folio',folio));return}
+    if(LIVE){await adm('reservas','update',{estado:status},folio);return}
     const s=demoLoad();const r=s.res.find(x=>x.id===folio);if(r)r.status=status;demoSave(s);
   },
   async addBlock(date,why,aplica){
     aplica=aplica||'todo';
-    if(LIVE){ok(await sb().from('fechas_bloqueadas').insert({fecha:date,motivo:why,aplica}));return}
+    if(LIVE){await adm('fechas_bloqueadas','insert',{fecha:date,motivo:why,aplica});return}
     const s=demoLoad();s.blocked.push({date,why,aplica});demoSave(s);
   },
   async removeBlock(date){
-    if(LIVE){ok(await sb().from('fechas_bloqueadas').delete().eq('fecha',date));return}
+    if(LIVE){await adm('fechas_bloqueadas','delete',null,date);return}
     const s=demoLoad();s.blocked=s.blocked.filter(b=>b.date!==date);demoSave(s);
   },
   /* crea o edita un servicio completo (it = objeto con id, name, desc, cat, price, stock, w, d, h, color, top, shape) */
   async saveService(it){
-    if(LIVE){ok(await sb().from('catalogo').upsert(rowOf(it),{onConflict:'item_id'}));return}
+    if(LIVE){await adm('catalogo','upsert',rowOf(it));return}
     const s=demoLoad();s.catalog=s.catalog||{};
     s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false,img:it.img||'',model:'',modelRot:0,domicilio:it.domicilio!==false};
     demoSave(s);
@@ -433,7 +406,7 @@ const API={
   /* guarda el terreno completo (medidas, suelo, cerco, foto, modelo y elementos) */
   async saveTerrain(t){
     t=sanitizeTerrain(t);
-    if(LIVE){ok(await sb().from('terreno').upsert(terrainRow(t),{onConflict:'id'}));return}
+    if(LIVE){await adm('terreno','upsert',terrainRow(t));return}
     const s=demoLoad();s.terrain=t;demoSave(s);
   },
   /* Sube una foto (kind='img') o un modelo .glb (kind='model') y devuelve la dirección pública.
@@ -441,56 +414,52 @@ const API={
   async uploadFile(kind,fileOrBlob,hint){
     const safe=String(hint||'servicio').toLowerCase().replace(/[^a-z0-9-]+/g,'-').slice(0,30);
     if(!LIVE){
-      if(kind==='model')throw new Error('Subir modelos 3D requiere la base de datos real (Supabase). En modo demo se usa la figura simple.');
+      if(kind==='model')throw new Error('Subir modelos 3D requiere el servidor con base de datos (Railway). En modo demo se usa la figura simple.');
       return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(new Error('No se pudo leer la imagen.'));fr.readAsDataURL(fileOrBlob)});
     }
-    const ext=kind==='model'?'glb':'jpg';
-    const path=safe+'-'+Date.now().toString(36)+'.'+ext;
-    const st=sb().storage.from(kind==='model'?'modelos':'servicios');
-    const up=await st.upload(path,fileOrBlob,{upsert:true,contentType:kind==='model'?'model/gltf-binary':'image/jpeg',cacheControl:'31536000'});
-    if(up.error)throw new Error(up.error.message);
-    return st.getPublicUrl(path).data.publicUrl;
+    const d=await api('POST','/api/admin/archivos?tipo='+(kind==='model'?'model':'img')+'&nombre='+encodeURIComponent(safe),fileOrBlob);
+    return d.url;
   },
   /* ---------- zonas de despacho (arriendo a domicilio) ---------- */
   async saveZona(z){
-    if(LIVE){const row={id:z.id,nombre:z.nombre,precio:Math.round(z.precio),activa:z.activa!==false,orden:z.orden||100};ok(await sb().from('zonas_despacho').upsert(row,{onConflict:'id'}));return}
+    if(LIVE){const row={id:z.id,nombre:z.nombre,precio:Math.round(z.precio),activa:z.activa!==false,orden:z.orden||100};await adm('zonas_despacho','upsert',row);return}
     const s=demoLoad();s.zonas=s.zonas||ZONAS_DEMO.map(z=>Object.assign({},z));const i=s.zonas.findIndex(x=>x.id===z.id);
     if(i>=0)s.zonas[i]=Object.assign({},z);else s.zonas.push(Object.assign({},z));demoSave(s);
   },
   async deleteZona(id){
-    if(LIVE){ok(await sb().from('zonas_despacho').delete().eq('id',id));return}
+    if(LIVE){await adm('zonas_despacho','delete',null,id);return}
     const s=demoLoad();s.zonas=(s.zonas||ZONAS_DEMO).filter(x=>x.id!==id);demoSave(s);
   },
   /* ---------- cartera, ofertas y propuestas ---------- */
   async saveCliente(c){
-    if(LIVE){const row=clienteRow(c);if(c.id)ok(await sb().from('clientes_extra').update(row).eq('id',c.id));else ok(await sb().from('clientes_extra').insert(row));return}
+    if(LIVE){const row=clienteRow(c);if(c.id)await adm('clientes_extra','update',row,c.id);else await adm('clientes_extra','insert',row);return}
     const s=demoLoad();s.clientes=s.clientes||[];
     if(c.id){const i=s.clientes.findIndex(x=>x.id===c.id);if(i>=0)s.clientes[i]=Object.assign({},c)}
     else s.clientes.push(Object.assign({},c,{id:Date.now()}));
     demoSave(s);
   },
   async deleteCliente(id){
-    if(LIVE){ok(await sb().from('clientes_extra').delete().eq('id',id));return}
+    if(LIVE){await adm('clientes_extra','delete',null,id);return}
     const s=demoLoad();s.clientes=(s.clientes||[]).filter(x=>x.id!==id);demoSave(s);
   },
   async saveOferta(o){
-    if(LIVE){const row={titulo:o.titulo,texto:o.texto,hasta:o.hasta||null,activa:o.activa!==false};if(o.id)ok(await sb().from('ofertas').update(row).eq('id',o.id));else ok(await sb().from('ofertas').insert(row));return}
+    if(LIVE){const row={titulo:o.titulo,texto:o.texto,hasta:o.hasta||null,activa:o.activa!==false};if(o.id)await adm('ofertas','update',row,o.id);else await adm('ofertas','insert',row);return}
     const s=demoLoad();s.ofertas=s.ofertas||[];
     if(o.id){const i=s.ofertas.findIndex(x=>x.id===o.id);if(i>=0)s.ofertas[i]=Object.assign({},o)}
     else s.ofertas.push(Object.assign({},o,{id:Date.now()}));
     demoSave(s);
   },
   async deleteOferta(id){
-    if(LIVE){ok(await sb().from('ofertas').delete().eq('id',id));return}
+    if(LIVE){await adm('ofertas','delete',null,id);return}
     const s=demoLoad();s.ofertas=(s.ofertas||[]).filter(x=>x.id!==id);demoSave(s);
   },
   async markProposal(clave){
-    if(LIVE){ok(await sb().from('propuestas').upsert({clave},{onConflict:'clave'}));return}
+    if(LIVE){await adm('propuestas','upsert',{clave});return}
     const s=demoLoad();s.propuestas=s.propuestas||[];if(!s.propuestas.includes(clave))s.propuestas.push(clave);demoSave(s);
   },
   /* "eliminar" = ocultar del sitio; las reservas antiguas siguen mostrando su servicio */
   async deleteService(id){
-    if(LIVE){ok(await sb().from('catalogo').update({activo:false}).eq('item_id',id));return}
+    if(LIVE){await adm('catalogo','update',{activo:false},id);return}
     const s=demoLoad();s.catalog=s.catalog||{};const it=byId(id);
     s.catalog[id]=Object.assign({},s.catalog[id]||{name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape},{active:false});
     demoSave(s);
