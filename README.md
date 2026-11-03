@@ -1,7 +1,7 @@
-# Divertí Kids · Plataforma web de reservas con simulador 3D
+# Divertí Kids · Desarrollo e implementación de un ecosistema digital integral para la gestión y visualización 3D de servicios de eventos infantiles
 
 Proyecto de título y práctica profesional de Abraham Zambrano Pérez (Ingeniería en Informática, Santo Tomás Arica).
-Plataforma web para Divertí Kids, empresa de arriendo de juegos y servicios para fiestas infantiles en el Valle de Azapa, Arica.
+Plataforma web para Divertí Kids (Entretenciones Francisco Javier Hernández Gibbs EIRL), empresa de arriendo de juegos y servicios para fiestas infantiles en el Valle de Azapa, Arica.
 
 - **Sitio de clientes** (`index.html`): catálogo, disponibilidad por fecha y franja, simulador 3D de la parcela, cotización, reserva con pago del abono (30 %) a través del sitio, arriendo a domicilio, ofertas y chatbot.
 - **Panel de administración** (`admin.html`): reservas, clientes, cumpleaños, balance mensual, ofertas, domicilio, servicios y terreno.
