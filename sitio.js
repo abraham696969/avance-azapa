@@ -113,5 +113,39 @@ if(!TODO&&!QUIETO&&'IntersectionObserver' in window){
    document.querySelector('.hero2').addEventListener('pointermove',e=>{const r=h.getBoundingClientRect();const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;h.style.setProperty('--px',(x*14).toFixed(1)+'px');h.style.setProperty('--py',(y*10).toFixed(1)+'px')});
  }}
 
+/* ---------- fotos reales en la portada ----------
+   Usa las fotos que la empresa sube a cada servicio en el panel. Mientras no haya fotos, se ve el castillo dibujado. */
+{const h=$('.hero-ilus');
+ let fotos=[],i=0,timer=null,firma='';
+ const caja=document.createElement('div');caja.className='hero-fotos';caja.hidden=true;
+ caja.innerHTML='<div class="hf-marco"></div><div class="hf-puntos" role="tablist" aria-label="Fotos de los juegos"></div>';
+ h&&h.appendChild(caja);
+ const marco=caja.querySelector('.hf-marco'),puntos=caja.querySelector('.hf-puntos');
+ function ir(n){
+   if(!fotos.length)return;i=(n+fotos.length)%fotos.length;
+   marco.querySelectorAll('figure').forEach((f,k)=>f.classList.toggle('on',k===i));
+   puntos.querySelectorAll('button').forEach((b,k)=>b.setAttribute('aria-selected',k===i));
+ }
+ const parar=()=>{clearInterval(timer);timer=null};
+ const andar=()=>{parar();if(!QUIETO&&fotos.length>1)timer=setInterval(()=>ir(i+1),4500)};
+ function armar(){
+   const lista=((window.DK&&DK.CAT)||[]).filter(it=>it.img&&it.id!=='parcela'&&it.active!==false);
+   const f=lista.map(it=>it.id+'|'+it.img).join(',');
+   if(f===firma)return;firma=f;
+   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+   fotos=lista.slice(0,8);
+   marco.innerHTML=fotos.map((it,k)=>`<figure class="${k===0?'on':''}"><img src="${esc(it.img)}" alt="${esc(it.name)}" ${k?'loading="lazy"':''} decoding="async"><figcaption>${esc(it.name)}</figcaption></figure>`).join('');
+   puntos.innerHTML=fotos.length>1?fotos.map((it,k)=>`<button type="button" role="tab" aria-label="Ver ${esc(it.name)}" aria-selected="${k===0}"></button>`).join(''):'';
+   marco.querySelectorAll('img').forEach(im=>im.onerror=()=>{im.closest('figure').remove();fotos=fotos.filter(x=>x.img!==im.getAttribute('src'));if(!fotos.length)mostrarFotos(false)});
+   i=0;mostrarFotos(fotos.length>0);andar();
+ }
+ function mostrarFotos(on){if(!h)return;caja.hidden=!on;h.classList.toggle('con-fotos',on);on?h.removeAttribute('aria-hidden'):h.setAttribute('aria-hidden','true')}
+ puntos.addEventListener('click',e=>{const b=e.target.closest('button');if(b){ir([...puntos.children].indexOf(b));andar()}});
+ marco.addEventListener('click',()=>{location.hash='servicios'});
+ caja.addEventListener('pointerenter',parar);caja.addEventListener('pointerleave',andar);
+ const cat=$('#catalog');
+ if(h&&cat){new MutationObserver(armar).observe(cat,{childList:true});armar()}
+}
+
 window.DKNav={mostrar:n=>mostrar(paginaDe(n)||'inicio',n),actual:()=>actual,todo:TODO};
 })();

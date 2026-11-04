@@ -49,6 +49,22 @@ const antes = await p.textContent('#cartpill');
 await p.click('#servicios [data-add]'); await p.waitForTimeout(200);
 assert.notEqual(await p.textContent('#cartpill'), antes); ok('agregar un servicio actualiza el carrito (con animación)');
 
+// fotos de los juegos en la portada (las que la empresa sube en el panel)
+await p.goto(srv.url + '/index.html#inicio'); await p.waitForTimeout(500);
+assert(await p.isVisible('.castillo') && !(await p.isVisible('.hero-fotos'))); ok('sin fotos subidas, la portada muestra el castillo dibujado');
+await p.evaluate(() => { DK.CAT.filter(i => i.id !== 'parcela').slice(0, 3).forEach(i => i.img = 'logo.png'); document.querySelector('#tabs .tab').click(); });
+await p.waitForTimeout(500);
+assert(await p.isVisible('.hero-fotos') && !(await p.isVisible('.castillo'))); ok('con fotos subidas, la portada muestra las fotos en vez del dibujo');
+assert.equal(await p.$$eval('.hf-marco figure', f => f.length), 3); assert.equal(await p.$$eval('.hf-puntos button', f => f.length), 3); ok('hay una foto y un punto por cada juego con foto');
+await p.click('.hf-puntos button:nth-child(3)'); await p.waitForTimeout(100);
+assert.match(await p.getAttribute('.hf-marco figure:nth-child(3)', 'class'), /on/); ok('los puntos cambian la foto');
+assert.equal(await p.textContent('.hf-marco figure.on figcaption'), await p.getAttribute('.hf-marco figure.on img', 'alt')); ok('cada foto lleva el nombre del juego');
+await p.click('.hf-marco'); await p.waitForTimeout(400);
+assert.deepEqual(await visibles(p), ['servicios']); ok('al tocar la foto se abre el catálogo');
+await p.evaluate(() => { DK.CAT.forEach(i => i.img = 'no-existe.jpg'); document.querySelector('#tabs .tab').click(); });
+await p.evaluate(() => { location.hash = 'inicio'; }); await p.waitForTimeout(900);
+assert(await p.isVisible('.castillo')); ok('si las fotos no cargan, vuelve el dibujo');
+
 // ---------- celular ----------
 const m = await (await b.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true })).newPage();
 m.on('pageerror', e => errs.push('celular: ' + e.message));

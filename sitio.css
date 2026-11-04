@@ -124,6 +124,22 @@ body.pub section{padding-block:44px 8px}
 .hero-badge{position:absolute;left:-6px;bottom:6px;width:104px;height:104px;border-radius:50%;box-shadow:0 10px 24px rgba(0,0,0,.25);border:4px solid #fff;animation:gira 9s ease-in-out infinite}
 @keyframes gira{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
 
+/* fotos de los juegos (las sube la empresa en el panel) */
+.hero-ilus.con-fotos .castillo,.hero-ilus.con-fotos .globo.g3{display:none}
+.hero-fotos{position:relative;padding:14px 14px 0}
+.hf-marco{position:relative;aspect-ratio:4/3;border-radius:30px;overflow:hidden;border:6px solid #fff;cursor:pointer;
+  box-shadow:0 0 0 4px var(--pink),0 22px 40px rgba(62,64,149,.25);transform:rotate(2deg);transition:transform .4s cubic-bezier(.3,1.5,.5,1)}
+.hf-marco:hover{transform:rotate(0) scale(1.02)}
+.hf-marco figure{position:absolute;inset:0;margin:0;opacity:0;transition:opacity .8s ease}
+.hf-marco figure.on{opacity:1}
+.hf-marco img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.06);transition:transform 5s ease-out}
+.hf-marco figure.on img{transform:scale(1)}
+.hf-marco figcaption{position:absolute;left:14px;bottom:14px;background:var(--accent);color:var(--ink);font-family:var(--f-display);font-weight:800;padding:6px 14px;border-radius:99px;box-shadow:0 4px 0 #C99A00}
+.hf-puntos{display:flex;gap:8px;justify-content:center;margin-top:16px}
+.hf-puntos button{width:12px;height:12px;border-radius:99px;border:0;padding:0;background:#E3D4B5;cursor:pointer;transition:width .3s,background .3s}
+.hf-puntos button[aria-selected="true"]{width:30px;background:var(--pink)}
+.hero-ilus.con-fotos .hero-badge{z-index:2;bottom:auto;top:-8px;left:-8px;width:84px;height:84px}
+
 /* botones */
 body.pub .btn{border-radius:16px;transition:transform .15s,box-shadow .15s,background .2s}
 body.pub .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--ink);box-shadow:0 5px 0 #C99A00}
