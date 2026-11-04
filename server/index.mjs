@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---------- Archivos públicos del sitio (solo estos se entregan; nunca el código del servidor) ----------
-const PUBLIC = new Set(['index.html', 'admin.html', 'app.js', 'admin.js', 'shared.js', 'styles.css', 'config.js',
+const PUBLIC = new Set(['index.html', 'admin.html', 'app.js', 'admin.js', 'shared.js', 'styles.css', 'sitio.css', 'sitio.js', 'config.js',
   'favicon.png', 'logo.png', 'logo-sm.png', 'apple-touch-icon.png']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png' };
 

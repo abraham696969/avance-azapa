@@ -11,7 +11,7 @@ const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const p = await ctx.newPage(); p.on('pageerror', e => errs.push('público: ' + e.message)); p.on('dialog', d => d.accept());
 const pad = x => String(x).padStart(2, '0'); const hoy = new Date();
 const st = () => p.evaluate(() => JSON.parse(localStorage['diverti-kids-demo-v2']));
-await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
+await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(800);
 
 // ---- selector de modalidad
 assert(await p.isVisible('#modo')); assert.equal(await p.getAttribute('[data-modo=parcela]', 'aria-pressed'), 'true'); assert(await p.isVisible('#simulador')); assert(!(await p.isVisible('#lugarFs'))); ok('por defecto la modalidad es la parcela, con simulador 3D y sin datos de lugar');

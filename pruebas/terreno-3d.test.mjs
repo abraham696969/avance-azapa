@@ -44,7 +44,7 @@ async function abrir(terreno, catalog) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
   await ctx.addInitScript(FAKE); await ctx.addInitScript(estado(terreno, catalog));
-  const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.goto(srv.url + '/index.html'); await p.waitForTimeout(1200); return p;
+  const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(1200); return p;
 }
 const resumen = p => p.evaluate(() => {
   const s = window.__scene, proc = s.children.find(c => c.children.some(k => k.geometry && k.geometry.type === 'plane')), geo = o => o.geometry ? o.geometry.type + ':' + o.geometry.args.map(v => Math.round(v * 100) / 100).join(',') : 'grupo';

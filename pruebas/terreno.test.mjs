@@ -12,7 +12,7 @@ const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const p = await ctx.newPage(); p.on('pageerror', e => errs.push('sitio: ' + e.message));
 const a = await ctx.newPage(); a.on('pageerror', e => errs.push('admin: ' + e.message)); a.on('dialog', d => d.accept());
 
-await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
+await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(800);
 let t = await p.evaluate(() => ({ w: DK.TERR.w, d: DK.TERR.d, n: DK.OBST.length, ground: DK.TERR.ground }));
 assert.deepEqual(t, { w: 30, d: 20, n: 4, ground: 'pasto' }); ok('sin configuración, el sitio usa el terreno de ejemplo (30 × 20 m, quincho y 3 árboles)');
 

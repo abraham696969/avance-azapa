@@ -12,7 +12,7 @@ await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
 await ctx.route(/cdnjs.*xlsx/, r => r.fulfill({ contentType: 'text/javascript', body: XSTUB }));
 const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const p = await ctx.newPage(); p.on('pageerror', e => errs.push('público: ' + e.message));
-await p.goto(srv.url + '/index.html'); await p.waitForTimeout(700);
+await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(700);
 
 // ---- redes y WhatsApp
 assert.equal(await p.locator('header a[data-social=instagram]').getAttribute('href'), 'https://www.instagram.com/diverti_.kids/');

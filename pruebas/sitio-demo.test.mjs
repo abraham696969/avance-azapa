@@ -9,7 +9,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch
 await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
 const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const p = await ctx.newPage(); p.on('pageerror', e => errs.push('público: ' + e.message));
-await p.goto(srv.url + '/index.html'); await p.waitForTimeout(800);
+await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(800);
 await p.click('[data-add="castillo"]'); await p.fill('#cKid','Sofía'); await p.fill('#cKidBirth','2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
 assert(await p.isVisible('#payOv')); ok('se abre la ventana de pago');
 assert(await p.isVisible('#cardBlock')); ok('en modo demo se ven los campos de tarjeta de prueba');

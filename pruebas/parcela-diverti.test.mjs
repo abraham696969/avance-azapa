@@ -11,7 +11,7 @@ await a.goto(srv.url + '/admin.html'); await a.waitForTimeout(500); await a.fill
 await a.click('#tPreset'); await a.waitForTimeout(200);
 assert.equal(await a.inputValue('#tW'), '48'); assert.equal(await a.inputValue('#tD'), '44'); assert.equal(await a.inputValue('#tGround'), 'tierra'); assert.equal(await a.locator('#tePlan .it').count(), 8); ok('el botón carga 48 × 44 m, suelo de tierra y los 8 elementos de la foto');
 await a.click('#tSave'); await a.waitForTimeout(500);
-const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.goto(srv.url + '/index.html'); await p.waitForTimeout(900);
+const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(900);
 const r = await p.evaluate(() => { const T = DK.TERR, bad = DK.OBST.filter(o => Math.abs(o.x) + o.w / 2 > T.w / 2 + .01 || Math.abs(o.z) + o.d / 2 > T.d / 2 + .01).map(o => o.name);
   const c = DK.OBST.filter(o => o.solid !== false).filter((o, i, A) => A.some((q, j) => j > i && Math.abs(o.x - q.x) < (o.w + q.w) / 2 - .5 && Math.abs(o.z - q.z) < (o.d + q.d) / 2 - .5)).map(o => o.name); return { w: T.w, n: DK.OBST.length, bad, c } });
 assert.deepEqual(r, { w: 48, n: 8, bad: [], c: [] }); ok('el sitio usa la parcela y ningún elemento sale del terreno ni se pisan los sólidos entre sí');

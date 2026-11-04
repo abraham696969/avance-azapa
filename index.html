@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="es">
 <head>
-<title>Divertí Kids</title>
+<title>Divertí Kids · Juegos y eventos infantiles en Arica</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F7F6FC" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#12113A" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Arriendo de juegos inflables, máquinas de comida, piscinas y parcela para cumpleaños en el Valle de Azapa, Arica. Arma tu fiesta en 3D y reserva en línea.">
+<meta name="theme-color" content="#FFF7E8">
 <meta name="application-name" content="Divertí Kids">
 <meta name="apple-mobile-web-app-title" content="Divertí Kids">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,66 +16,144 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="sitio.css">
 </head>
-<body>
+<body class="pub">
+<div class="cielo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
 <header class="top"><div class="wrap">
   <a class="logo" href="#inicio" aria-label="Divertí Kids Arica, inicio"><img class="logo-img" src="logo-sm.png" srcset="logo-sm.png 1x, logo.png 3x" width="56" height="56" alt="Divertí Kids Arica"></a>
   <nav class="main" aria-label="Principal">
-    <a href="#servicios">Servicios</a><a href="#ofertas" id="navOfertas" hidden>Ofertas</a><a href="#fecha">Fecha</a><a href="#simulador" id="navSim">Simulador 3D</a><a href="#reservar">Reservar</a>
+    <a href="#inicio" data-nav="inicio">Inicio</a><a href="#servicios" data-nav="servicios">Juegos y servicios</a><a href="#fiesta" data-nav="fiesta">Arma tu fiesta</a><span id="navSim" hidden></span><a href="#reservar" data-nav="reservar">Reservar</a><a href="#contacto" data-nav="contacto">Contacto</a><a href="#ofertas" id="navOfertas" class="nav-ofertas" hidden>Ofertas</a>
   </nav>
   <span class="social" aria-label="Redes sociales y contacto">
     <a data-social="instagram" href="#" target="_blank" rel="noopener" aria-label="Instagram de Divertí Kids" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
-    <a data-social="facebook" href="#" target="_blank" rel="noopener" aria-label="Facebook de Divertí Kids" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v8h4v-8h3l1-4h-4V8.500c0-.300.200-.500.500-.500z"/></svg></a>
-    <a data-wa href="#" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp" title="WhatsApp"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.600 15.100L2 22l5-1.300A10 10 0 1 0 12 2zm0 18.200c-1.500 0-3-.4-4.200-1.200l-.3-.2-3 .8.8-2.900-.2-.3A8.200 8.200 0 1 1 12 20.200zm4.500-6.100c-.2-.1-1.500-.7-1.700-.8s-.4-.1-.6.100-.6.800-.8 1-.3.200-.6.100a6.700 6.700 0 0 1-3.300-2.900c-.3-.4.300-.4.800-1.400.1-.2 0-.3 0-.5l-.8-1.900c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.300 3 3 0 0 0-.9 2.200c0 1.300.9 2.500 1 2.700s1.800 2.800 4.400 3.900c1.600.7 2.300.7 3.100.6.500-.1 1.500-.6 1.700-1.200s.2-1.100.2-1.200-.2-.2-.5-.3z"/></svg></a>
+    <a data-social="facebook" href="#" target="_blank" rel="noopener" aria-label="Facebook de Divertí Kids" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v8h4v-8h3l1-4h-4V8.5c0-.3.2-.5.5-.5z"/></svg></a>
+    <a data-wa href="#" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp" title="WhatsApp"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.2-.6.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.8-1.4.1-.2 0-.3 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1 2.7s1.8 2.8 4.4 3.9c1.6.7 2.3.7 3.1.6.5-.1 1.5-.6 1.7-1.2s.2-1.1.2-1.2-.2-.2-.5-.3z"/></svg></a>
   </span>
   <a class="cartpill num" href="#reservar" id="cartpill">0 ítems · $0</a>
 </div></header>
 
-<main class="wrap" id="inicio">
-  <div class="hero">
-    <div>
-      <img class="hero-logo" src="logo.png" width="176" height="176" alt="Logo de Divertí Kids Arica" fetchpriority="high">
-      <p class="eyebrow">Divertí Kids · Eventos infantiles · Valle de Azapa, Arica</p>
-      <h1 style="margin-top:12px">Mira tu fiesta en la parcela <mark>antes de arrendar</mark></h1>
-      <p class="lead">Elige la fecha, arrastra los juegos sobre un modelo 3D del terreno y reserva con un abono en línea. Todo en menos de 5 minutos.</p>
+<!-- Pasos de la reserva (se ven en las páginas del recorrido) -->
+<nav class="pasos wrap" aria-label="Pasos de la reserva" id="pasos">
+  <a href="#servicios" data-paso="servicios"><b>1</b><span>Elige tus juegos</span></a>
+  <a href="#fiesta" data-paso="fiesta"><b>2</b><span>Fecha y diseño</span></a>
+  <a href="#reservar" data-paso="reservar"><b>3</b><span>Reserva y paga</span></a>
+</nav>
+
+<main id="app">
+
+<!-- ================= INICIO ================= -->
+<div class="page" data-page="inicio" id="inicio">
+  <section class="hero2 wrap">
+    <div class="hero-txt">
+      <p class="chip-star">Valle de Azapa · Arica</p>
+      <h1>Mira tu fiesta <span class="bloques"><b>antes</b> <b>de</b> <b>arrendar</b></span></h1>
+      <p class="lead">Juegos inflables, máquinas de comida, piscinas y nuestra parcela. Elige la fecha, ubica los juegos en un modelo 3D del terreno y reserva con un abono en línea.</p>
       <div class="cta-row">
-        <a class="btn primary" href="#fecha">Elegir fecha</a>
-        <a class="btn" href="#simulador">Diseñar en 3D</a>
+        <a class="btn primary big" href="#servicios">Ver juegos y servicios</a>
+        <a class="btn big alt" href="#fiesta">Arma tu fiesta en 3D</a>
       </div>
     </div>
-    <ol class="steps">
-      <li><b>1</b><span>Explora el catálogo<small>Juegos, comida, piscinas y la parcela</small></span></li>
-      <li><b>2</b><span>Elige fecha y franja<small>La agenda muestra solo lo disponible</small></span></li>
-      <li><b>3</b><span>Ubica todo en el simulador 3D<small>Mover, rotar y ver colisiones</small></span></li>
-      <li><b>4</b><span>Revisa la cotización<small>Se calcula sola desde tu diseño</small></span></li>
-      <li><b>5</b><span>Paga el abono<small>Recibes la confirmación por correo</small></span></li>
-    </ol>
-  </div>
+    <div class="hero-ilus" aria-hidden="true">
+      <svg viewBox="0 0 420 360" class="castillo">
+        <defs>
+          <linearGradient id="gPink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF4FA6"/><stop offset="1" stop-color="#E5007E"/></linearGradient>
+          <linearGradient id="gInd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A58C8"/><stop offset="1" stop-color="#3E4095"/></linearGradient>
+          <linearGradient id="gYel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE45C"/><stop offset="1" stop-color="#FECD28"/></linearGradient>
+          <linearGradient id="gGre" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2BD07A"/><stop offset="1" stop-color="#00A85A"/></linearGradient>
+        </defs>
+        <ellipse cx="210" cy="338" rx="178" ry="14" fill="#000" opacity=".08"/>
+        <!-- base -->
+        <rect x="46" y="282" width="328" height="50" rx="24" fill="url(#gInd)"/>
+        <!-- pared -->
+        <rect x="80" y="150" width="260" height="144" rx="26" fill="url(#gYel)"/>
+        <path d="M80 182 q32 -28 65 0 q32 -28 65 0 q32 -28 65 0 q32 -28 65 0 v-14 a26 26 0 0 0 -26 -26 h-208 a26 26 0 0 0 -26 26z" fill="url(#gPink)"/>
+        <!-- arco -->
+        <path d="M168 294 v-58 a42 42 0 0 1 84 0 v58z" fill="#1f1d5c"/>
+        <path d="M180 294 v-54 a30 30 0 0 1 60 0 v54z" fill="#2c2a7a"/>
+        <!-- torres -->
+        <g class="torre t1"><rect x="40" y="104" width="62" height="190" rx="24" fill="url(#gGre)"/><path d="M34 112 L71 44 L108 112z" fill="url(#gPink)"/><circle cx="71" cy="42" r="7" fill="#FECD28"/><rect x="58" y="150" width="26" height="34" rx="13" fill="#fff" opacity=".85"/></g>
+        <g class="torre t2"><rect x="318" y="104" width="62" height="190" rx="24" fill="url(#gGre)"/><path d="M312 112 L349 44 L386 112z" fill="url(#gPink)"/><circle cx="349" cy="42" r="7" fill="#FECD28"/><rect x="336" y="150" width="26" height="34" rx="13" fill="#fff" opacity=".85"/></g>
+        <g class="torre t3"><rect x="182" y="70" width="56" height="96" rx="22" fill="url(#gInd)"/><path d="M176 78 L210 18 L244 78z" fill="url(#gGre)"/><path d="M210 18 v-16 l22 8 -22 8z" fill="#E5007E"/></g>
+        <!-- estrellas en la pared -->
+        <g fill="#fff" opacity=".9"><path d="M120 222 l5 10 11 2 -8 8 2 11 -10 -5 -10 5 2 -11 -8 -8 11 -2z"/><path d="M290 222 l5 10 11 2 -8 8 2 11 -10 -5 -10 5 2 -11 -8 -8 11 -2z"/></g>
+      </svg>
+      <span class="globo g1"></span><span class="globo g2"></span><span class="globo g3"></span>
+      <img class="hero-badge" src="logo.png" width="120" height="120" alt="">
+    </div>
+  </section>
 
-  <section id="modo">
-    <div class="sec-head"><p class="eyebrow">Modalidad</p><h2>¿Dónde será la fiesta?</h2>
+  <svg class="ola" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 30 C240 70 480 -10 720 30 S1200 70 1440 30 V60 H0z" fill="var(--ola-amarilla)"/></svg>
+  <section class="banda banda-amarilla">
+    <div class="wrap">
+      <h2 class="t-centro">¿Dónde será la fiesta?</h2>
+      <div class="modos2" id="modosInicio">
+        <button type="button" class="modo2" data-ir-modo="parcela"><span class="ico ico-parcela"></span><b>En nuestra parcela</b><span>Piscina, quincho, canchas y espacio para todos. Arma tu distribución en el simulador 3D.</span><em>Elegir parcela →</em></button>
+        <button type="button" class="modo2" data-ir-modo="domicilio" id="irDomicilio"><span class="ico ico-casa"></span><b>En tu casa o local</b><span>Llevamos, montamos y retiramos los juegos donde tú digas. Nos cuentas el suelo y las medidas.</span><em>Elegir a domicilio →</em></button>
+      </div>
+    </div>
+  </section>
+  <svg class="ola abajo" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 30 C240 -10 480 70 720 30 S1200 -10 1440 30 V0 H0z" fill="var(--ola-amarilla)"/></svg>
+
+  <section class="wrap">
+    <h2 class="t-centro">¿Qué quieres para tu fiesta?</h2>
+    <div class="cats">
+      <a class="cat c-verde" href="#servicios" data-ir-cat="juegos"><span class="ico ico-inflable"></span><b>Juegos inflables y de mesa</b><small>Castillos, toboganes, canchas, taca-taca y ping pong</small></a>
+      <a class="cat c-rosa" href="#servicios" data-ir-cat="comida"><span class="ico ico-comida"></span><b>Máquinas de comida</b><small>Papas fritas, algodón de azúcar y completos</small></a>
+      <a class="cat c-azul" href="#servicios" data-ir-cat="piscinas"><span class="ico ico-piscina"></span><b>Piscinas</b><small>Chica y grande, por bloques de horario</small></a>
+      <a class="cat c-amarillo" href="#servicios" data-ir-cat="local"><span class="ico ico-parcela"></span><b>Arriendo de la parcela</b><small>Recinto con cerco, quincho y árboles</small></a>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <h2 class="t-centro">Así de fácil</h2>
+    <ol class="como">
+      <li class="c-verde"><span class="n">1</span><b>Elige tus juegos</b><span>Mira precios, medidas y qué queda libre en tu fecha.</span><a href="#servicios">Ir al catálogo</a></li>
+      <li class="c-rosa"><span class="n">2</span><b>Escoge la fecha</b><span>La agenda solo te muestra lo disponible, mañana o tarde.</span><a href="#fecha">Ver la agenda</a></li>
+      <li class="c-azul"><span class="n">3</span><b>Diseña en 3D</b><span>Arrastra los juegos sobre la parcela y mira si caben.</span><a href="#simulador">Abrir el simulador</a></li>
+      <li class="c-amarillo"><span class="n">4</span><b>Reserva con abono</b><span>Pagas el 30 % y el resto el día de la fiesta.</span><a href="#reservar">Reservar</a></li>
+    </ol>
+  </section>
+
+  <section class="wrap">
+    <div class="cta-band">
+      <div><h2>¿Tienes dudas?</h2><p>Nuestro asistente responde al tiro precios, disponibilidad y cómo reservar. Si prefieres, escríbenos por WhatsApp.</p></div>
+      <div class="cta-row"><button type="button" class="btn primary big" data-abrir-chat>Preguntarle al asistente</button><a class="btn big alt" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a></div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= JUEGOS Y SERVICIOS ================= -->
+<div class="page" data-page="servicios">
+  <header class="pbanner rosa"><div class="wrap"><h1>Juegos y servicios</h1><p>Elige dónde será la fiesta y agrega lo que quieras. Al agregar un juego, aparece de inmediato en tu diseño 3D.</p></div></header>
+  <section id="modo" class="wrap">
+    <div class="sec-head"><h2>¿Dónde será la fiesta?</h2>
       <p>Puedes celebrar en nuestra parcela o llevamos los juegos y servicios a tu casa o local.</p></div>
     <div class="modos">
       <button type="button" class="modo" data-modo="parcela" aria-pressed="true"><b>En nuestra parcela</b><span>Piscina, quincho, canchas y espacio para todos. Reserva y arma tu distribución en el simulador 3D.</span></button>
       <button type="button" class="modo" data-modo="domicilio" aria-pressed="false"><b>En tu casa o local</b><span>Llevamos, montamos y retiramos los juegos y servicios donde tú digas. Nos cuentas el suelo y las medidas del lugar.</span></button>
     </div>
   </section>
-
-  <section id="servicios">
-    <div class="sec-head"><p class="eyebrow">Catálogo</p><h2>Todo lo que arrendamos</h2>
-      <p>Cada ficha muestra la medida real en planta. Al agregar un servicio, aparece de inmediato en el simulador. Precios y stock de ejemplo, editables desde el panel de administración.</p></div>
+  <section id="servicios" class="wrap">
+    <div class="sec-head"><h2>Todo lo que arrendamos</h2>
+      <p>Cada ficha muestra la medida real en planta y cuántos quedan libres en la fecha elegida. Precios y stock de ejemplo, editables desde el panel de administración.</p></div>
     <div class="tabs" id="tabs"></div>
     <div class="grid" id="catalog"></div>
   </section>
-
-  <section id="ofertas" hidden>
-    <div class="sec-head"><p class="eyebrow">Tablón de ofertas</p><h2>Ofertas vigentes</h2>
+  <section id="ofertas" class="wrap" hidden>
+    <div class="sec-head"><h2>Ofertas vigentes</h2>
       <p>Promociones del momento. Para aprovecharlas, escríbenos por WhatsApp o menciónalas al reservar.</p></div>
     <div class="offers" id="offers"></div>
   </section>
+  <div class="wrap siguiente"><a class="btn primary big" href="#fiesta">Siguiente: fecha y diseño →</a></div>
+</div>
 
-  <section id="fecha">
-    <div class="sec-head"><p class="eyebrow">Agenda digital</p><h2>¿Cuándo es la fiesta?</h2>
+<!-- ================= ARMA TU FIESTA ================= -->
+<div class="page" data-page="fiesta" id="fiesta">
+  <header class="pbanner verde"><div class="wrap"><h1>Arma tu fiesta</h1><p>Elige el día y la franja, y distribuye los juegos en la parcela para ver cómo queda.</p></div></header>
+  <section id="fecha" class="wrap">
+    <div class="sec-head"><h2>¿Cuándo es la fiesta?</h2>
       <p>La disponibilidad se calcula por servicio y franja. Una fecha ocupada no se puede reservar dos veces.</p></div>
     <div class="agenda">
       <div class="panel">
@@ -95,10 +173,9 @@
       </div>
     </div>
   </section>
-
-  <section id="simulador">
-    <div class="sec-head"><p class="eyebrow">Simulador 3D</p><h2>Arma la distribución de tu evento</h2>
-      <p>Arrastra los objetos por el terreno. No se pueden superponer ni salir del cerco. Las medidas de la parcela son referenciales (30 × 20 m) y se reemplazan por las tomadas en terreno.</p></div>
+  <section id="simulador" class="wrap">
+    <div class="sec-head"><h2>Arma la distribución de tu evento</h2>
+      <p>Arrastra los objetos por el terreno. No se pueden superponer ni salir del cerco. Las medidas de la parcela son referenciales y se reemplazan por las tomadas en terreno.</p></div>
     <div class="sim">
       <div class="stage" id="stage">
         <canvas id="cv" aria-label="Modelo 3D de la parcela"></canvas>
@@ -125,9 +202,14 @@
       </div>
     </div>
   </section>
+  <div class="wrap siguiente"><a class="btn ghost big" href="#servicios">← Volver a los juegos</a><a class="btn primary big" href="#reservar">Siguiente: reservar →</a></div>
+</div>
 
-  <section id="reservar">
-    <div class="sec-head"><p class="eyebrow">Cotización y pago</p><h2>Confirma tu reserva</h2>
+<!-- ================= RESERVAR ================= -->
+<div class="page" data-page="reservar">
+  <header class="pbanner azul"><div class="wrap"><h1>Reserva y paga</h1><p>Revisa tu cotización, completa tus datos y confirma la fecha con el abono del 30 %.</p></div></header>
+  <section id="reservar" class="wrap">
+    <div class="sec-head"><h2>Confirma tu reserva</h2>
       <p id="bookNote">La cotización sale de lo que ubicaste en el terreno. El abono del 30% confirma la fecha.</p></div>
     <div class="book" id="bookArea">
       <div class="panel">
@@ -187,12 +269,43 @@
       </div>
     </div>
   </section>
+</div>
 
-  <footer>
-    <span>Divertí Kids · Valle de Azapa, Arica · <a data-social="instagram" href="#" target="_blank" rel="noopener" style="color:inherit">Instagram</a> · <a data-social="facebook" href="#" target="_blank" rel="noopener" style="color:inherit">Facebook</a> · <a data-wa href="#" target="_blank" rel="noopener" style="color:inherit">WhatsApp</a></span>
-    <span><span id="payNote">Pagos en ambiente de pruebas: no se cobra dinero.</span> · <a href="admin.html" rel="nofollow" style="color:inherit">Administración</a></span>
-  </footer>
+<!-- ================= CONTACTO ================= -->
+<div class="page" data-page="contacto" id="contacto">
+  <header class="pbanner amarillo"><div class="wrap"><h1>Contacto</h1><p>Escríbenos, síguenos o pregúntale al asistente. Te ayudamos a organizar la fiesta.</p></div></header>
+  <section class="wrap">
+    <div class="contactos">
+      <a class="contacto c-verde" data-wa href="#" target="_blank" rel="noopener"><span class="ico ico-wa"></span><b>WhatsApp</b><small id="cWa">Escríbenos</small></a>
+      <a class="contacto c-rosa" data-social="instagram" href="#" target="_blank" rel="noopener"><span class="ico ico-ig"></span><b>Instagram</b><small>@diverti_.kids</small></a>
+      <a class="contacto c-azul" data-social="facebook" href="#" target="_blank" rel="noopener"><span class="ico ico-fb"></span><b>Facebook</b><small>Divertí Kids</small></a>
+      <button type="button" class="contacto c-amarillo" data-abrir-chat><span class="ico ico-chat"></span><b>Asistente virtual</b><small>Precios, fechas y cómo reservar</small></button>
+    </div>
+    <div class="panel datos-neg" id="datosNeg">
+      <h3>Dónde y cuándo</h3>
+      <dl>
+        <div><dt>Ubicación</dt><dd id="nDir">Valle de Azapa, Arica</dd></div>
+        <div id="nHorBox" hidden><dt>Horario de atención</dt><dd id="nHor"></dd></div>
+        <div id="nMailBox" hidden><dt>Correo</dt><dd id="nMail"></dd></div>
+      </dl>
+    </div>
+  </section>
+</div>
+
 </main>
+
+<footer class="pie">
+  <svg class="ola" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 30 C240 70 480 -10 720 30 S1200 70 1440 30 V60 H0z" fill="#25265E"/></svg>
+  <div class="pie-in"><div class="wrap">
+    <span class="pie-marca"><img src="logo-sm.png" width="44" height="44" alt=""> Divertí Kids · Valle de Azapa, Arica</span>
+    <span>
+      <a data-social="instagram" href="#" target="_blank" rel="noopener">Instagram</a> ·
+      <a data-social="facebook" href="#" target="_blank" rel="noopener">Facebook</a> ·
+      <a data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
+    </span>
+    <span><span id="payNote">Pagos en ambiente de pruebas: no se cobra dinero.</span> · <a href="admin.html" rel="nofollow">Administración</a></span>
+  </div></div>
+</footer>
 
 <!-- Pago -->
 <div class="overlay" id="payOv" hidden>
@@ -230,11 +343,11 @@
 </div>
 <div class="toast" id="toast" hidden></div>
 
-
 <script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="shared.js"></script>
+<script src="sitio.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

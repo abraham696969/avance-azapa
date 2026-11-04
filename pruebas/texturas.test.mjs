@@ -16,7 +16,7 @@ await a.fill('#eW', '30'); await a.dispatchEvent('#eW', 'change'); await a.fill(
 await a.selectOption('#eTex', 'madera'); await a.waitForTimeout(100);
 assert((await a.locator('#tePlan .it rect[stroke-dasharray]').first().getAttribute('stroke-dasharray'))); ok('en el plano lo intangible se ve con borde punteado');
 await a.click('#tSave'); await a.waitForTimeout(500);
-const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.goto(srv.url + '/index.html'); await p.waitForTimeout(900);
+const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(900);
 let r = await p.evaluate(() => ({ o: DK.OBST.map(o => [o.t, o.tex, o.solid]), placed: document.querySelectorAll('[data-add="castillo"]').length }));
 assert(r.o.some(x => x[0] === 'zona' && x[1] === 'madera' && x[2] === false)); ok('el sitio recibe la textura y que es intangible');
 await p.click('[data-add="castillo"]'); await p.waitForTimeout(300);
@@ -26,7 +26,7 @@ const pos = await p.evaluate(() => { const c = DK.byId('castillo'); return { w: 
 { const bb = await a.locator('#tePlan .it').first().boundingBox(); await a.mouse.click(bb.x + 4, bb.y + 4); await a.waitForTimeout(150); }
 assert.equal(await a.inputValue('#eTex'), 'madera');
 await a.selectOption('#eSolid', '1'); await a.click('#tSave'); await a.waitForTimeout(400);
-const p2 = await ctx.newPage(); p2.on('pageerror', e => errs.push(e.message)); await p2.goto(srv.url + '/index.html'); await p2.waitForTimeout(900);
+const p2 = await ctx.newPage(); p2.on('pageerror', e => errs.push(e.message)); await p2.goto(srv.url + '/index.html?todo=1'); await p2.waitForTimeout(900);
 const ocupados = await p2.evaluate(() => document.querySelector('#toast') ? 0 : 0); await p2.click('[data-add="castillo"]'); await p2.waitForTimeout(300);
 const msg = await p2.evaluate(() => (document.querySelector('.toast,#toast')||{}).textContent || ''); assert(/No hay espacio/.test(msg), msg); ok('si el mismo suelo se marca como sólido, ya no se puede poner un juego encima');
 await b.close(); srv.close(); console.log(errs.length ? errs.join('\n') : `\nTodo bien: ${n} comprobaciones.`); process.exit(errs.length ? 1 : 0);

@@ -13,7 +13,7 @@ const errs = []; let n = 0; const ok = (m) => console.log('  ✓', m, `(${++n})`
 const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message));
 
 // --- reservar y pagar ---
-await p.goto(s.url + '/index.html'); await p.waitForTimeout(900);
+await p.goto(s.url + '/index.html?todo=1'); await p.waitForTimeout(900);
 await p.click('[data-add="castillo"]'); await p.fill('#cKid', 'Sofía'); await p.fill('#cKidBirth', '2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
 assert(!(await p.isVisible('#cardBlock'))); assert(await p.isVisible('#onlineNote')); ok('con el servidor y Flow activos se ocultan los campos de tarjeta de prueba y se explica el pago en Flow');
 assert((await p.textContent('#payGo')).includes('Flow')); ok('el botón dice "Ir a pagar a Flow"');
@@ -32,7 +32,7 @@ await p.goto(s.url + '/api/flow/retorno?token=TOK1'); await p.waitForTimeout(130
 assert((await p.textContent('#bookArea')).includes('¡Pago recibido!')); assert(!p.url().includes('folio=')); assert.equal((await db('select estado from reservas'))[0].estado, 'confirmada');
 ok('al volver de Flow se ve "¡Pago recibido!", la reserva está confirmada en la base y la dirección queda limpia');
 const ver = async (texto, codigo = res.codigo) => {
-  await p.goto(s.url + `/index.html?folio=${res.folio}&c=${codigo}`); await p.waitForTimeout(1200);
+  await p.goto(s.url + `/index.html?todo=1&folio=${res.folio}&c=${codigo}`); await p.waitForTimeout(1200);
   const t = await p.textContent('#bookArea'); assert(t.includes(texto), `esperaba "${texto}" y salió "${t.slice(0, 120)}"`);
 };
 await db("update reservas set estado = 'pendiente'"); await ver('Recibimos tu pago'); ok('retorno con revisión pendiente lo explica');
@@ -71,7 +71,7 @@ ok('la foto (reducida a JPG) y el modelo .glb quedan guardados en la base');
 const [cm] = await db("select imagen, modelo3d, modelo_rot from catalogo where nombre = 'Castillo con modelo'");
 assert(cm.imagen.startsWith('/archivos/') && cm.modelo3d.endsWith('.glb') && cm.modelo_rot === 90); ok('en el servicio quedan las direcciones de los archivos y el giro del modelo');
 assert((await a.textContent('#priceBody')).includes('3D real')); ok('la lista del panel marca los servicios con modelo 3D real');
-await p.goto(s.url + '/index.html'); await p.waitForTimeout(1000);
+await p.goto(s.url + '/index.html?todo=1'); await p.waitForTimeout(1000);
 const im = p.locator('#catalog article:has-text("Castillo con modelo") .plan img');
 await im.scrollIntoViewIfNeeded(); await p.waitForFunction(() => { const i = document.querySelector('#catalog article:has(img) .plan img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
 assert((await im.getAttribute('src')).startsWith('/archivos/')); ok('la foto subida se ve en el catálogo público, servida por el servidor');

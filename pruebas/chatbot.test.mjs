@@ -45,7 +45,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || 
 const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
 const errs = []; page.on('pageerror', e => errs.push(e.message));
 await page.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
-await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
+await page.goto(pathToFileURL(path.join(root, 'index.html')).href + '?todo=1');
 await page.waitForTimeout(800);
 await page.click('#chatFab');
 const filas = []; let bien = 0;
