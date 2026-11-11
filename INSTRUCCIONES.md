@@ -216,7 +216,10 @@ Si Chromium no está en `/opt/pw-browsers/chromium`, indica tu navegador con la 
 | El servidor no arranca: "ADMIN_PASSWORD debe tener al menos 10 caracteres" | Usa una clave más larga en `ADMIN_PASSWORD`. |
 | "No se pudo conectar con el servidor" | Revisa en Railway que el servicio esté activo (en verde) y mira sus registros (*Deployments* > *View logs*). |
 | "Correo o contraseña incorrectos" en el panel | Usa exactamente `ADMIN_EMAIL` y `ADMIN_PASSWORD` de Railway. |
-| Al pagar dice "No se pudo iniciar el pago" | Revisa `FLOW_API_KEY` y `FLOW_SECRET_KEY` (y `FLOW_API_URL` si estás en producción). Mira los registros del servicio en Railway. |
+| Al pagar dice "No se pudo iniciar el pago" | Revisa `FLOW_API_KEY` y `FLOW_SECRET_KEY` (y `FLOW_API_URL` si estás en producción). Mira los registros del servicio en Railway. La fecha no queda apartada: se puede reintentar al tiro. |
+| Al pagar dice "Flow no aceptó el correo…" | Flow solo acepta correos reales (rechaza, por ejemplo, los `@ejemplo.cl`). Corrige el correo y vuelve a intentarlo. |
+| Railway dice "Auto deploy unavailable" o "Could not load branches" | La app de Railway perdió permiso para leer el repositorio. En GitHub: *Settings* > *Applications* > *Railway* > *Configure* y dale acceso al repositorio. Mientras tanto, en Railway: Ctrl + K > **Deploy latest commit** (el sitio sigue en línea durante el cambio). |
+| Chrome muestra "Peligroso" o "Sitio engañoso" | Google Navegación segura marcó la dirección. Revisa su estado en https://transparencyreport.google.com/safe-browsing/search y, después de corregir la causa, pide la revisión en Google Search Console (*Seguridad y acciones manuales* > *Problemas de seguridad* > *Solicitar revisión*). Un dominio propio reduce este riesgo. |
 | Pagué en Flow pero sigue "por_pagar" | Flow debe poder llegar a `https://tu-direccion/api/flow/confirmacion`; si usas dominio propio, revisa `SITE_URL`. Flow reintenta el aviso. |
 | "El plazo para pagar venció" | Pasaron más de 30 minutos; hay que reservar de nuevo. |
 | Una reserva quedó "pendiente" con una nota en rojo | Flow cobró un monto distinto o el cupo se perdió: revísala en el panel (y reembolsa si corresponde). |
