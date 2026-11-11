@@ -14,7 +14,19 @@ const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message));
 
 // --- reservar y pagar ---
 await p.goto(s.url + '/index.html?todo=1'); await p.waitForTimeout(900);
-await p.click('[data-add="castillo"]'); await p.fill('#cKid', 'Sofía'); await p.fill('#cKidBirth', '2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
+const vacios = await p.evaluate(() => ['cName', 'cMail', 'cPhone', 'cGuests', 'cKid'].map((id) => document.getElementById(id).value));
+assert.deepEqual(vacios, ['', '', '', '', '']); assert(!(await p.textContent('#reservar')).includes('ejemplo'));
+ok('en el sitio publicado el formulario parte vacío, sin datos de ejemplo');
+await p.click('[data-add="castillo"]');
+await p.fill('#cName', 'Ana Pérez'); await p.fill('#cMail', 'ana@ejemplo.cl'); await p.fill('#cPhone', '+56 9 1234 5678'); await p.fill('#cGuests', '20');
+await p.fill('#cKid', 'Sofía'); await p.fill('#cKidBirth', '2020-03-05'); await p.check('#cConsent'); await p.click('#payBtn'); await p.waitForTimeout(200);
+assert(!(await p.isVisible('#payOv'))); assert.match(await p.textContent('#formErr'), /correo real/); ok('no deja reservar con un correo de ejemplo');
+// Flow rechaza el correo: el cliente ve qué corregir y puede reintentar en la misma fecha
+await p.fill('#cMail', 'ana@rechazado.cl'); await p.click('#payBtn'); await p.waitForTimeout(200); await p.click('#payGo'); await p.waitForTimeout(1200);
+assert.match(await p.textContent('#payMsg'), /no aceptó el correo ana@rechazado\.cl/); assert(!(await p.locator('#payGo').isDisabled()));
+assert.equal((await db("select estado from reservas"))[0].estado, 'cancelada'); ok('si Flow rechaza el correo se explica en pantalla y la fecha no queda apartada');
+await db('delete from reservas');
+await p.click('#payCancel'); await p.fill('#cMail', 'ana@gmail.com'); await p.click('#payBtn'); await p.waitForTimeout(200);
 assert(!(await p.isVisible('#cardBlock'))); assert(await p.isVisible('#onlineNote')); ok('con el servidor y Flow activos se ocultan los campos de tarjeta de prueba y se explica el pago en Flow');
 assert((await p.textContent('#payGo')).includes('Flow')); ok('el botón dice "Ir a pagar a Flow"');
 await p.click('#payGo'); await p.waitForURL(/\/pay\?token=TOK1/, { timeout: 8000 });
@@ -79,5 +91,5 @@ await a.click('#logout'); await a.waitForTimeout(400); assert(await a.isVisible(
 await a.reload(); await a.waitForTimeout(700); assert(await a.isVisible('#loginView')); ok('cerrar sesión vuelve al login y la sesión ya no sirve al recargar');
 
 await b.close(); s.close();
-const e2 = s.errores.map(String);
+const e2 = s.errores.map(String).filter((e) => !e.includes('ana@rechazado.cl'));   // ese rechazo de Flow es parte de la prueba
 console.log(errs.length || e2.length ? '\nERRORES:\n' + [...errs, ...e2].join('\n') : `\nTodo bien: ${n} comprobaciones, sin errores de página.`); process.exit(errs.length || e2.length ? 1 : 0);

@@ -348,6 +348,7 @@ $('#clientForm').addEventListener('submit',e=>{
   e.preventDefault();const err=$('#formErr');err.hidden=true;
   const n=$('#cName').value.trim(),m=$('#cMail').value.trim(),t=$('#cPhone').value.trim(),g=+$('#cGuests').value;
   if(n.length<3||!/^\S+@\S+\.\S+$/.test(m)||t.replace(/\D/g,'').length<8||!(g>0)){err.textContent='Revisa tus datos: nombre, un correo válido, un teléfono de al menos 8 dígitos y la cantidad de invitados.';err.hidden=false;return}
+  if(API.mode==='servidor'&&/@(ejemplo|example)\./i.test(m)){err.textContent='Escribe tu correo real: ahí te llega la confirmación de la reserva.';err.hidden=false;return}
   const kid=$('#cKid').value.trim(),kb=$('#cKidBirth').value;
   if(kid.length<2){err.textContent='Escribe el nombre del niño o niña cumpleañero/a.';err.hidden=false;return}
   if(!kb||parseISO(kb)>today||parseISO(kb)<new Date(today.getFullYear()-25,today.getMonth(),today.getDate())){err.textContent='Indica la fecha de nacimiento del niño o niña (la usamos para saludarlo en su cumpleaños).';err.hidden=false;return}
@@ -538,8 +539,12 @@ if(API.online){ // pago real en Flow: se ocultan los campos de tarjeta de prueba
   ['#cardBlock','.sandbox:not(#onlineNote)'].forEach(q=>{const e=document.querySelector(q);if(e)e.hidden=true});
   $('#onlineNote').hidden=false;if((window.DK_CONFIG||{}).PAGO_PRUEBAS===false)$('#payNote').textContent='Pagos seguros con Flow.';$('#payGo').textContent='Ir a pagar a Flow';$('#payT').textContent='Pagar abono en línea';
 }
+// En el modo demo el formulario y el terreno parten con datos de ejemplo para probar rápido.
+// En el sitio publicado (con servidor) parten vacíos: el cliente escribe sus datos y elige sus juegos.
+const DEMO=API.mode==='demo';
+if(DEMO)[['#cName','Camila Rojas (ejemplo)'],['#cMail','camila@ejemplo.cl'],['#cPhone','+56 9 1234 5678'],['#cGuests','25']].forEach(([q,v])=>{const e=$(q);if(e&&!e.value)e.value=v});
 if(THREE_OK){
-  ['castillo','tacataca','papas','piscinaS','algodon'].forEach(id=>{const it=byId(id);if(!it)return;const sp=findSpot(it);if(sp)spawn(id,sp[0],sp[1],0)});
+  if(DEMO)['castillo','tacataca','papas','piscinaS','algodon'].forEach(id=>{const it=byId(id);if(!it)return;const sp=findSpot(it);if(sp)spawn(id,sp[0],sp[1],0)});
   // vista inicial del terreno
   Object.assign(cam,{theta:0.5,phi:0.85,r:34*CAM_K});
 }

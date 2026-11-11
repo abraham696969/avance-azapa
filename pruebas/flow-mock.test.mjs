@@ -60,6 +60,21 @@ s.flow.status = 4; await c('POST', '/api/flow/confirmacion', 'token=TOK3', { sin
 assert.equal((await fila(r4.folio)).estado, 'cancelada'); ok('pago anulado en Flow → la reserva se cancela y libera el cupo');
 s.flow.status = 2;
 
+// Flow rechaza el correo: se explica al cliente y la fecha queda libre para reintentar
+const conCorreo = async (email) => (await c('POST', '/api/reservas', {
+  p_fecha: futura(17), p_franja: 'manana', p_nombre: 'Ana Pérez', p_email: email, p_telefono: '+56 9 1234 5678', p_invitados: 20,
+  p_items: { papas: 1 }, p_parcela: true, p_layout: [], p_metodo: 'Flow', p_online: true, p_nino: 'Sofía', p_nacimiento: '2020-03-05', p_acepta: true })).datos;
+const rc = await conCorreo('ana@rechazado.cl');
+r = await c('POST', '/api/pago', { folio: rc.folio, codigo: rc.codigo });
+assert.equal(r.status, 502); assert.match(r.datos.error, /no aceptó el correo ana@rechazado\.cl/);
+ok('si Flow rechaza el correo, el cliente ve cuál correo revisar');
+const fc = await fila(rc.folio); assert.equal(fc.estado, 'cancelada'); assert.match(fc.nota, /No se pudo iniciar el pago en Flow/);
+const rc2 = await conCorreo('ana@gmail.com');
+assert(rc2.folio && rc2.folio !== rc.folio, JSON.stringify(rc2));
+r = await c('POST', '/api/pago', { folio: rc2.folio, codigo: rc2.codigo }); assert.equal(r.status, 200);
+ok('el intento fallido no deja la fecha apartada: se corrige el correo y se reserva la misma franja');
+
+
 // clave secreta equivocada
 const otroFlow = await flowSimulado();
 const mal = await servidor({ flow: otroFlow, env: { FLOW_SECRET_KEY: 'otra' } });
@@ -68,6 +83,7 @@ const r5 = (await cm('POST', '/api/reservas', { p_fecha: futura(19), p_franja: '
   p_invitados: 20, p_items: {}, p_parcela: true, p_online: true, p_nino: 'Sofía', p_nacimiento: '2020-03-05', p_acepta: true })).datos;
 r = await cm('POST', '/api/pago', { folio: r5.folio, codigo: r5.codigo });
 assert.equal(r.status, 502); assert.match(r.datos.error, /No se pudo iniciar el pago/);
+assert.equal((await mal.db.query('select estado from reservas where folio = $1', [r5.folio])).rows[0].estado, 'cancelada');
 r = await cm('POST', '/api/flow/confirmacion', 'token=TOK1', { sinDk: true });
 assert.equal(r.status, 500); ok('con una clave secreta equivocada Flow rechaza la firma: no se cobra y la confirmación responde 500 (Flow reintentaría)');
 mal.close();

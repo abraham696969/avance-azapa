@@ -278,7 +278,15 @@ export async function crearApp({ db, env = process.env, log = console }) {
         return enviar(res, 200, { url: `${out.url}?token=${out.token}` });
       } catch (e) {
         log.error(e);
-        return enviar(res, 502, { error: 'No se pudo iniciar el pago. Intenta de nuevo en unos minutos.' });
+        // el pago no alcanzó a empezar: se libera la fecha para que el cliente pueda corregir y reintentar
+        await db.query(`update reservas set estado = 'cancelada', nota = $2 where folio = $1 and estado = 'por_pagar'`,
+          [r.folio, 'No se pudo iniciar el pago en Flow: ' + String(e.message).slice(0, 200)]).catch((x) => log.error(x));
+        const correo = /userEmail|email/i.test(String(e.message));
+        return enviar(res, 502, {
+          error: correo
+            ? 'Flow no aceptó el correo ' + r.email + '. Revisa que esté bien escrito y vuelve a intentarlo.'
+            : 'No se pudo iniciar el pago. Tu fecha no quedó apartada: vuelve a intentarlo en unos minutos.',
+        });
       }
     }
     // Flow avisa aquí cuando cambia un pago. Debe recibir 200; si no, reintenta.

@@ -24,6 +24,8 @@ export async function flowSimulado() {
     res.setHeader('Content-Type', 'application/json');
     if (!firmaOk(p) || p.apiKey !== FLOW_KEY) { res.statusCode = 401; return res.end(JSON.stringify({ code: 105, message: 'firma inválida' })); }
     if (u.pathname === '/api/payment/create') {
+      // como Flow real: rechaza correos que no considera válidos
+      if (/@rechazado\./.test(p.email || '')) { res.statusCode = 400; return res.end(JSON.stringify({ code: 1620, message: `The userEmail: ${p.email} is not valid.` })); }
       const token = 'TOK' + (f.pagos.size + 1);
       f.pagos.set(token, { orden: p.commerceOrder, monto: Number(p.amount), flowOrder: 700 + f.pagos.size });
       return res.end(JSON.stringify({ url: `http://127.0.0.1:${f.port}/pay`, token, flowOrder: 777 }));
