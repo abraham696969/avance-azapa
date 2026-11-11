@@ -28,6 +28,8 @@ assert.equal((await db("select estado from reservas"))[0].estado, 'cancelada'); 
 await db('delete from reservas');
 await p.click('#payCancel'); await p.fill('#cMail', 'ana@gmail.com'); await p.click('#payBtn'); await p.waitForTimeout(200);
 assert(!(await p.isVisible('#cardBlock'))); assert(await p.isVisible('#onlineNote')); ok('con el servidor y Flow activos se ocultan los campos de tarjeta de prueba y se explica el pago en Flow');
+assert.equal(await p.locator('#cardN, #cardC, input[name=pm]').count(), 0); assert(!(await p.content()).includes('CVV'));
+ok('el sitio publicado no tiene ningún campo de tarjeta en la página (evita que Google lo marque como engañoso)');
 assert((await p.textContent('#payGo')).includes('Flow')); ok('el botón dice "Ir a pagar a Flow"');
 await p.click('#payGo'); await p.waitForURL(/\/pay\?token=TOK1/, { timeout: 8000 });
 ok('el navegador es enviado a la página de pago que entregó Flow');

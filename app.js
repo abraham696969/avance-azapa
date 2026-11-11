@@ -362,7 +362,7 @@ $('#payCancel').onclick=()=>$('#payOv').hidden=true;
 $('#payGo').onclick=async()=>{
   const msg=$('#payMsg'),go=$('#payGo');msg.hidden=false;msg.style.color='var(--muted)';
   const online=API.online;
-  const num=$('#cardN').value.replace(/\D/g,'');
+  const num=online?'':$('#cardN').value.replace(/\D/g,'');
   if(!online&&num.length!==16){msg.style.color='var(--bad)';msg.textContent='El número de tarjeta debe tener 16 dígitos.';return}
   go.disabled=true;
   if(online)msg.innerHTML='<span class="spin"></span> Reservando tu cupo y preparando el pago…';
@@ -535,8 +535,13 @@ $('#clearAll').onclick=()=>{[...S.placed].forEach(p=>scene&&scene.remove(p.mesh)
 document.addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;if(e.key==='r'||e.key==='R')rotateSel(1);if((e.key==='Delete'||e.key==='Backspace')&&S.sel){e.preventDefault();removeUid(S.sel)}});
 
 initScene();
-if(API.online){ // pago real en Flow: se ocultan los campos de tarjeta de prueba
-  ['#cardBlock','.sandbox:not(#onlineNote)'].forEach(q=>{const e=document.querySelector(q);if(e)e.hidden=true});
+if(!API.online){ // sin pago real: simulador de tarjeta de prueba (no está en el HTML para que el sitio publicado nunca muestre campos de tarjeta)
+  $('#cardBlock').innerHTML='<p class="sandbox">Ambiente de pruebas. Usa la tarjeta ya cargada. Con 4000 0000 0000 0002 se simula un pago rechazado.</p>'
+    +'<div class="methods" id="methods"><label><input type="radio" name="pm" value="Webpay Plus" checked>Webpay Plus</label><label><input type="radio" name="pm" value="Flow">Flow</label><label><input type="radio" name="pm" value="Mercado Pago">Mercado Pago</label></div>'
+    +'<div class="field"><label for="cardN">Número de tarjeta</label><input id="cardN" inputmode="numeric" value="4051 8856 0044 6623"></div>'
+    +'<div class="two"><div class="field"><label for="cardE">Vencimiento</label><input id="cardE" value="12/30"></div><div class="field"><label for="cardC">CVV</label><input id="cardC" value="123" inputmode="numeric"></div></div>';
+}else{ // pago real en Flow
+  $('#cardBlock').remove();
   $('#onlineNote').hidden=false;if((window.DK_CONFIG||{}).PAGO_PRUEBAS===false)$('#payNote').textContent='Pagos seguros con Flow.';$('#payGo').textContent='Ir a pagar a Flow';$('#payT').textContent='Pagar abono en línea';
 }
 // En el modo demo el formulario y el terreno parten con datos de ejemplo para probar rápido.

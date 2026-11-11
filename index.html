@@ -312,16 +312,8 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="payT">
     <h3 id="payT">Pagar abono</h3>
     <p class="price num" id="payAmt"></p>
-    <p class="sandbox">Ambiente de pruebas. Usa la tarjeta ya cargada. Con 4000 0000 0000 0002 se simula un pago rechazado.</p>
-    <div id="cardBlock">
-    <div class="methods" id="methods">
-      <label><input type="radio" name="pm" value="Webpay Plus" checked>Webpay Plus</label>
-      <label><input type="radio" name="pm" value="Flow">Flow</label>
-      <label><input type="radio" name="pm" value="Mercado Pago">Mercado Pago</label>
-    </div>
-    <div class="field"><label for="cardN">Número de tarjeta</label><input id="cardN" inputmode="numeric" value="4051 8856 0044 6623"></div>
-    <div class="two"><div class="field"><label for="cardE">Vencimiento</label><input id="cardE" value="12/30"></div><div class="field"><label for="cardC">CVV</label><input id="cardC" value="123" inputmode="numeric"></div></div>
-    </div>
+    <!-- El simulador de tarjeta solo existe en el modo demo (lo agrega app.js). El sitio publicado paga en Flow y nunca pide datos de tarjeta. -->
+    <div id="cardBlock"></div>
     <p class="sandbox" id="onlineNote" hidden>Te llevaremos a <b>Flow</b> para pagar tu abono con tarjeta u otros medios habilitados. Tu cupo queda guardado por 30 minutos mientras pagas.</p>
     <p id="payMsg" class="note" style="font-weight:600" hidden></p>
     <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
