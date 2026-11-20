@@ -57,7 +57,7 @@ assert.equal(r.lugar.suelo, 'cemento'); assert.equal(r.lugar.ancho, 8); assert.e
 
 // ---- el pedido a domicilio no ocupa la parcela
 const fecha = r.date;
-assert.equal((await st()).res.filter(x => x.date === fecha && x.slot === r.slot && x.parcela).length, 0); ok('el pedido a domicilio no ocupa la parcela: esa fecha y franja siguen libres para arrendarla');
+assert.equal((await st()).res.filter(x => x.date === fecha && x.slot === r.slot && x.parcela).length, 0); ok('el pedido a domicilio no ocupa la parcela: ese día sigue libre para arrendarla');
 
 // ---- panel
 const a = await ctx.newPage(); a.on('pageerror', e => errs.push('admin: ' + e.message)); a.on('dialog', d => d.accept());
