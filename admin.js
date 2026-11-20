@@ -72,7 +72,7 @@ function render(){
   $$('[data-det]').forEach(b=>b.onclick=()=>{const k=b.dataset.det;openDet.has(k)?openDet.delete(k):openDet.add(k);render()});
   $('#blockList').innerHTML=DB.blocked.length?DB.blocked.map(b=>`<li><span>${fmtDate(b.date)}<br><span class="note">${esc(b.why)} · ${b.aplica==='parcela'?'solo la parcela':b.aplica==='domicilio'?'solo domicilio':'todo'}</span></span><button class="btn sm" data-unb="${b.date}">Quitar</button></li>`).join(''):'<li><span class="muted">No hay fechas bloqueadas</span><span></span></li>';
   $$('[data-unb]').forEach(b=>b.onclick=()=>doAct(()=>API.removeBlock(b.dataset.unb),'Fecha desbloqueada'));
-  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td>${i.img?`<img class="thumb" src="${esc(i.img)}" alt="" loading="lazy"> `:''}<b>${esc(i.name)}</b>${i.model?' <span class="badge ok">3D real</span>':''}${i.domicilio===false&&i.id!=='parcela'?' <span class="badge">Solo parcela</span>':''}<br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
+  $('#priceBody').innerHTML=CAT.map(i=>`<tr><td>${i.img?`<img class="thumb" src="${esc(i.img)}" alt="" loading="lazy"> `:''}<b>${esc(i.name)}</b>${i.model?' <span class="badge ok">3D real</span>':''}${(i.fotos||[]).length?` <span class="badge">+${i.fotos.length} foto${i.fotos.length>1?'s':''}</span>`:''}${i.domicilio===false&&i.id!=='parcela'?' <span class="badge">Solo parcela</span>':''}<br><span class="note">${esc(i.desc||'')}</span></td><td>${esc(CATS[i.cat]||i.cat)}</td><td><input class="p num" type="number" min="0" step="1000" value="${i.price}" data-pr="${i.id}" aria-label="Precio de ${esc(i.name)}"></td><td><input class="p num" style="width:70px" type="number" min="0" step="1" value="${i.stock}" data-sk="${i.id}" aria-label="Stock de ${esc(i.name)}"></td><td class="num">${i.w} × ${i.d} × ${i.h} m</td><td style="white-space:nowrap"><button class="btn sm" data-edit="${i.id}">Editar</button> ${i.id==='parcela'?'':`<button class="btn sm" data-del="${i.id}">Eliminar</button>`}</td></tr>`).join('');
   const quick=id=>{const it=byId(id);const p=Math.max(0,Math.round(+document.querySelector(`[data-pr="${id}"]`).value||0)),k=Math.max(0,Math.round(+document.querySelector(`[data-sk="${id}"]`).value||0));doAct(()=>API.saveService(Object.assign({},it,{price:p,stock:k})),'Servicio actualizado')};
   $$('[data-pr]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.pr));
   $$('[data-sk]').forEach(inp=>inp.onchange=()=>quick(inp.dataset.sk));
@@ -90,6 +90,18 @@ $('#sCat').innerHTML=Object.entries(CATS).map(([k,n])=>`<option value="${k}">${n
 $('#sShape').innerHTML=Object.entries(SHAPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 let pImg=null,pModel=null;   // archivos elegidos y aún no guardados ('quitar' = borrar el actual)
 let curImg='',curModel='';
+let fotos=[];   // fotos adicionales: {url} ya guardadas o {blob,prev} por subir
+function showFotos(){$('#sFotosList').innerHTML=fotos.map((f,k)=>`<span class="foto-mini"><img class="thumb" src="${esc(f.url||f.prev)}" alt="Foto ${k+1}"><button type="button" class="btn sm ghost" data-fdel="${k}" aria-label="Quitar foto ${k+1}">×</button></span>`).join('');
+  $$('[data-fdel]').forEach(b=>b.onclick=()=>{fotos.splice(+b.dataset.fdel,1);showFotos()})}
+$('#sFotos').addEventListener('change',async e=>{
+  const err=$('#sErr');err.hidden=true;
+  for(const f of [...e.target.files]){
+    if(fotos.length>=DK.MAX_FOTOS){err.textContent='Máximo '+DK.MAX_FOTOS+' fotos adicionales por servicio.';err.hidden=false;break}
+    if(f.size>15*1024*1024){err.textContent='Una foto pesa demasiado (máximo 15 MB).';err.hidden=false;continue}
+    try{const r=await DK.resizeImage(f,1000);fotos.push({blob:r.blob,prev:r.dataUrl})}catch(ex){err.textContent=ex.message;err.hidden=false}
+  }
+  e.target.value='';showFotos();
+});
 function showImg(src){const p=$('#sImgPrev');if(src){p.src=src;p.hidden=false}else{p.removeAttribute('src');p.hidden=true}$('#sImgDel').hidden=!src}
 function showModel(has,name){$('#sModelDel').hidden=!has;$('#sModelNote').textContent=has?('Modelo cargado: '+(name||'actual')+'. Se ajusta al ancho y largo reales.'):'Si no subes uno, el simulador usa una figura simple con las medidas y el color de arriba. El modelo se ajusta solo al ancho y largo reales.'}
 if(API.mode==='demo'){$('#sModel').disabled=true;$('#sModelNote').textContent='Los modelos 3D reales se pueden subir cuando el sitio funcione con el servidor y la base de datos (Railway). En modo demo se usa la figura simple.'}
@@ -106,10 +118,11 @@ $('#sModel').addEventListener('change',e=>{
   pModel=f;showModel(true,f.name);
 });
 $('#sModelDel').onclick=()=>{pModel='quitar';$('#sModel').value='';showModel(false)};
-function clearForm(){pImg=null;pModel=null;curImg='';curModel='';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value='0';showImg('');showModel(false);['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sDom').checked=true;$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
+function clearForm(){pImg=null;pModel=null;curImg='';curModel='';fotos=[];showFotos();$('#sFotos').value='';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value='0';showImg('');showModel(false);['sId','sName','sDesc','sPrice','sStock','sW','sD','sH'].forEach(i=>$('#'+i).value='');$('#sColor').value='#3d7bff';$('#sDom').checked=true;$('#sCat').value='juegos';$('#sShape').value='castle';$('#svcFormT').textContent='Agregar servicio';$('#sCancel').hidden=true;$('#sErr').hidden=true}
 function fillForm(it){
   $('#sId').value=it.id;$('#sName').value=it.name;$('#sDesc').value=it.desc||'';$('#sCat').value=it.cat;$('#sShape').value=it.shape==='land'?'castle':it.shape;
   $('#sPrice').value=it.price;$('#sStock').value=it.stock;$('#sW').value=it.w;$('#sD').value=it.d;$('#sH').value=it.h;$('#sColor').value=numHex(it.color);$('#sDom').checked=it.domicilio!==false;
+  fotos=(it.fotos||[]).map(url=>({url}));showFotos();$('#sFotos').value='';
   pImg=null;pModel=null;curImg=it.img||'';curModel=it.model||'';$('#sImg').value='';$('#sModel').value='';$('#sModelRot').value=String(it.modelRot||0);showImg(curImg);showModel(!!curModel,'actual');
   $('#svcFormT').textContent='Editar: '+it.name;$('#sCancel').hidden=false;$('#sErr').hidden=true;
   $('#svcForm').scrollIntoView({behavior:'smooth',block:'center'});
@@ -131,6 +144,7 @@ $('#svcForm').addEventListener('submit',e=>{
     try{
       if(pImg==='quitar')it.img='';else if(pImg)it.img=await API.uploadFile('img',pImg,id);
       if(pModel==='quitar')it.model='';else if(pModel){it.model=await API.uploadFile('model',pModel,id)}
+      const urls=[];for(const f of fotos)urls.push(f.url||await API.uploadFile('img',f.blob,id));it.fotos=urls;
       await API.saveService(it);clearForm();
     }finally{sv.disabled=false}
   },old.id?'Servicio actualizado':'Servicio agregado');

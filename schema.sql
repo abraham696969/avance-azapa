@@ -29,6 +29,7 @@ alter table public.catalogo add column if not exists orden      integer not null
 alter table public.catalogo add column if not exists imagen     text;                -- dirección de la foto (/archivos/...)
 alter table public.catalogo add column if not exists modelo3d   text;                -- dirección del modelo .glb (/archivos/...)
 alter table public.catalogo add column if not exists modelo_rot integer not null default 0;
+alter table public.catalogo add column if not exists fotos      jsonb   not null default '[]'::jsonb;   -- fotos adicionales (/archivos/...), se deslizan en el catálogo
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'catalogo_modelo_rot_chk') then
     alter table public.catalogo add constraint catalogo_modelo_rot_chk check (modelo_rot in (0,90,180,270));

@@ -321,6 +321,16 @@ header.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5p
 .card .plan.has-img{height:170px;background:var(--soft)}
 .card .plan.has-img>svg{opacity:0}
 .card .plan>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+/* galería: varias fotos que se deslizan hacia el lado */
+.card .plan .galeria{position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.card .plan .galeria::-webkit-scrollbar{display:none}
+.card .plan .galeria img{flex:0 0 100%;width:100%;height:100%;object-fit:cover;scroll-snap-align:center;display:block}
+.card .plan .gal-dots{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:5px;z-index:1;pointer-events:none}
+.card .plan .gal-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.6);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.card .plan .gal-dots i.on{background:#fff;width:16px;border-radius:99px}
+.card .plan .gal-btn{position:absolute;top:50%;transform:translateY(-50%);z-index:1;width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.85);color:#222;font-size:1.3rem;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.card .plan .gal-btn.prev{left:8px}.card .plan .gal-btn.next{right:8px}
+@media (hover:none){.card .plan .gal-btn{display:none}}
 .card .plan.has-img small{background:color-mix(in srgb,var(--surface) 88%,transparent);padding:2px 8px;border-radius:99px;color:var(--ink);z-index:1}
 .thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:6px;background:var(--soft)}
 .thumb.big{width:96px;height:96px;margin:0;border-radius:12px;border:1px solid var(--line)}
@@ -398,3 +408,9 @@ input[type=checkbox]:checked::after{opacity:1}
 input[type=checkbox]:focus-visible{outline:3px solid var(--pink,#d6208a);outline-offset:2px}
 label.check{padding:12px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg)}
 label.check input{width:22px;height:22px}
+
+/* panel: fotos adicionales del servicio */
+.fotos-list{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
+.fotos-list:empty{display:none}
+.foto-mini{display:inline-flex;align-items:center;gap:2px}
+.foto-mini .thumb{width:56px;height:56px;margin:0}

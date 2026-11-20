@@ -114,6 +114,7 @@ function applyCatalog(cat){
     if(c.shape)it.shape=c.shape;
     if(c.active!=null)it.active=!!c.active;
     if(c.img!==undefined)it.img=c.img||'';
+    if(c.fotos!==undefined)it.fotos=Array.isArray(c.fotos)?c.fotos.filter(u=>typeof u==='string'&&u):[];
     if(c.model!==undefined)it.model=c.model||'';
     if(c.modelRot!=null)it.modelRot=+c.modelRot||0;
     if(c.domicilio!==undefined)it.domicilio=c.domicilio!==false;
@@ -122,8 +123,11 @@ function applyCatalog(cat){
   DESIGN.length=0;CAT.filter(i=>i.id!=='parcela').forEach(i=>DESIGN.push(i));
 }
 const SHAPES={castle:'Inflable con torres',slide:'Tobogán inflable',field:'Cancha inflable',table:'Mesa de juego',pingpong:'Mesa de ping pong',machine:'Máquina o carro de comida',pool:'Piscina',box:'Otro objeto (caja)'};
-const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false,imagen:it.img||null,modelo3d:it.model||null,modelo_rot:it.modelRot||0,domicilio:it.domicilio!==false});
-const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo,img:x.imagen||'',model:x.modelo3d||'',modelRot:x.modelo_rot||0,domicilio:x.domicilio!==false});
+const rowOf=it=>({item_id:it.id,nombre:it.name,descripcion:it.desc||'',categoria:it.cat,precio:it.price,stock:it.stock,ancho:it.w,largo:it.d,alto:it.h,color:numHex(it.color),color_tope:it.shape==='machine'?numHex(it.top):null,forma:it.shape,activo:it.active!==false,imagen:it.img||null,modelo3d:it.model||null,modelo_rot:it.modelRot||0,domicilio:it.domicilio!==false,fotos:JSON.stringify((it.fotos||[]).slice(0,MAX_FOTOS))});
+const MAX_FOTOS=12;   // fotos adicionales por servicio
+/* Todas las fotos de un servicio: la principal y las adicionales */
+const galeria=it=>[it.img,...(it.fotos||[])].filter(Boolean);
+const fromRow=x=>({name:x.nombre,desc:x.descripcion,cat:x.categoria,price:x.precio,stock:x.stock,w:x.ancho,d:x.largo,h:x.alto,color:x.color,top:x.color_tope,shape:x.forma,active:x.activo,img:x.imagen||'',model:x.modelo3d||'',modelRot:x.modelo_rot||0,domicilio:x.domicilio!==false,fotos:Array.isArray(x.fotos)?x.fotos:[]});
 
 
 /* ============ Fotos y modelos 3D ============ */
@@ -319,13 +323,17 @@ const API={
   async loadPublic(){
     if(LIVE){
       const d=await api('GET','/api/publico');
+      // El servidor solo envía los servicios visibles. Los de ejemplo que vienen en el código y que
+      // la empresa eliminó (ocultó) desde el panel no llegan, así que se marcan como ocultos aquí.
+      const catalog=Object.fromEntries((d.catalogo||[]).map(x=>[x.item_id,fromRow(x)]));
+      ALL.forEach(i=>{if(!catalog[i.id]&&i.id!=='parcela')catalog[i.id]={active:false}});
       return {
         terrain:terrainFromRow(d.terreno),
         ofertas:(d.ofertas||[]).map(offerFromRow),
         zonas:(d.zonas||[]).map(zonaFromRow),
         res:(d.disponibilidad||[]).map(x=>({date:x.fecha,slot:x.franja,items:x.items||{},parcela:!!x.parcela,status:'activa'})),
         blocked:(d.bloqueos||[]).map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
-        catalog:Object.fromEntries((d.catalogo||[]).map(x=>[x.item_id,fromRow(x)]))
+        catalog
       };
     }
     const s=demoLoad();
@@ -413,7 +421,7 @@ const API={
   async saveService(it){
     if(LIVE){await adm('catalogo','upsert',rowOf(it));return}
     const s=demoLoad();s.catalog=s.catalog||{};
-    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false,img:it.img||'',model:'',modelRot:0,domicilio:it.domicilio!==false};
+    s.catalog[it.id]={name:it.name,desc:it.desc,cat:it.cat,price:it.price,stock:it.stock,w:it.w,d:it.d,h:it.h,color:numHex(it.color),top:numHex(it.top),shape:it.shape,active:it.active!==false,img:it.img||'',fotos:(it.fotos||[]).slice(0,MAX_FOTOS),model:'',modelRot:0,domicilio:it.domicilio!==false};
     demoSave(s);
   },
   /* guarda el terreno completo (medidas, suelo, cerco, foto, modelo y elementos) */
@@ -479,5 +487,5 @@ const API={
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,HORARIO,RETIROS,slotName,horarioTxt,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,SUELOS,TIPOS_LUGAR,siteChecks,needsPower,isInflable,nf,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,HORARIO,RETIROS,slotName,horarioTxt,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,galeria,MAX_FOTOS,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,SUELOS,TIPOS_LUGAR,siteChecks,needsPower,isInflable,nf,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
 })();

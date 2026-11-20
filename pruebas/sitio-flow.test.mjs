@@ -89,6 +89,26 @@ await p.goto(s.url + '/index.html?todo=1'); await p.waitForTimeout(1000);
 const im = p.locator('#catalog article:has-text("Castillo con modelo") .plan img');
 await im.scrollIntoViewIfNeeded(); await p.waitForFunction(() => { const i = document.querySelector('#catalog article:has(img) .plan img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
 assert((await im.getAttribute('src')).startsWith('/archivos/')); ok('la foto subida se ve en el catálogo público, servida por el servidor');
+// galería: fotos adicionales que se deslizan en la tarjeta
+const idCm = (await db("select item_id from catalogo where nombre = 'Castillo con modelo'"))[0].item_id;
+await a.click(`[data-edit="${idCm}"]`); await a.waitForTimeout(300);
+await a.setInputFiles('#sFotos', [{ name: 'f2.png', mimeType: 'image/png', buffer: png }, { name: 'f3.png', mimeType: 'image/png', buffer: png }]); await a.waitForTimeout(600);
+assert.equal(await a.locator('#sFotosList img').count(), 2); ok('el panel muestra las fotos adicionales elegidas antes de guardar');
+await a.click('#sSave'); await a.waitForTimeout(1200);
+const [gal] = await db(`select fotos from catalogo where item_id = '${idCm}'`);
+assert(Array.isArray(gal.fotos) && gal.fotos.length === 2 && gal.fotos.every((u) => u.startsWith('/archivos/')), JSON.stringify(gal)); ok('las fotos adicionales se suben y quedan guardadas en el servicio');
+await p.goto(s.url + '/index.html?todo=1'); await p.waitForTimeout(1000);
+await p.bringToFront(); const card = p.locator('#catalog article:has-text("Castillo con modelo")'); await card.scrollIntoViewIfNeeded();
+assert.equal(await card.locator('.galeria img').count(), 3); assert.equal(await card.locator('.gal-dots i').count(), 3);
+assert.equal(await card.locator('.gal-btn').count(), 2);   // flechas para computador (en pantallas táctiles se desliza con el dedo)
+await card.locator('.galeria').evaluate((g) => g.scrollTo({ left: g.clientWidth })); await p.waitForTimeout(700);
+assert.equal(await card.locator('.gal-dots i').nth(1).getAttribute('class'), 'on'); ok('en el catálogo las 3 fotos se deslizan hacia el lado y los puntos marcan la foto visible');
+assert((await p.textContent('#catalog')).includes('Cancha inflable'));
+await a.click('[data-del="cancha"]'); await a.waitForTimeout(700);
+assert.equal((await db("select activo from catalogo where item_id = 'cancha'"))[0].activo, false);
+await p.goto(s.url + '/index.html?todo=1'); await p.waitForTimeout(1000);
+assert(!(await p.textContent('#catalog')).includes('Cancha inflable') && (await p.textContent('#catalog')).includes('Castillo con modelo'));
+ok('un servicio de ejemplo eliminado en el panel desaparece del catálogo público');
 await a.click('#logout'); await a.waitForTimeout(400); assert(await a.isVisible('#loginView'));
 await a.reload(); await a.waitForTimeout(700); assert(await a.isVisible('#loginView')); ok('cerrar sesión vuelve al login y la sesión ya no sirve al recargar');
 

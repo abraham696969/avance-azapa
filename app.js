@@ -34,6 +34,17 @@ function renderTabs(){
   [['todos','Todo'],...Object.entries(CATS)].forEach(([k,n])=>{const b=document.createElement('button');b.className='tab';b.textContent=n;b.setAttribute('aria-pressed',S.cat===k);b.onclick=()=>{S.cat=k;renderTabs();renderCatalog()};t.appendChild(b)});
 }
 const countOf=id=>S.modo==='domicilio'?(S.qty[id]||0):S.placed.filter(p=>p.id===id).length;
+/* Fotos de la tarjeta: con más de una, se deslizan hacia el lado (dedo, rueda o flechas) */
+function fotosHTML(it){
+  const f=DK.galeria(it);if(!f.length)return '';
+  const img=(u,k)=>`<img src="${esc(u)}" alt="${esc(it.name)}${f.length>1?' (foto '+(k+1)+' de '+f.length+')':''}" loading="lazy" decoding="async" onerror="this.remove()">`;
+  if(f.length===1)return img(f[0],0);
+  return `<div class="galeria" tabindex="0" aria-label="Fotos de ${esc(it.name)}: desliza para ver más">${f.map(img).join('')}</div>`+
+    `<button type="button" class="gal-btn prev" aria-label="Foto anterior">‹</button><button type="button" class="gal-btn next" aria-label="Foto siguiente">›</button>`+
+    `<div class="gal-dots" aria-hidden="true">${f.map((_,k)=>`<i class="${k?'':'on'}"></i>`).join('')}</div>`;
+}
+document.addEventListener('click',e=>{const b=e.target.closest('.gal-btn');if(!b)return;const g=b.parentElement.querySelector('.galeria');if(g)g.scrollBy({left:(b.classList.contains('next')?1:-1)*g.clientWidth,behavior:'smooth'})});
+function galPuntos(g){const k=Math.round(g.scrollLeft/Math.max(1,g.clientWidth));g.parentElement.querySelectorAll('.gal-dots i').forEach((d,j)=>d.classList.toggle('on',j===k))}
 function renderCatalog(){
   const g=$('#catalog');g.innerHTML='';
   CAT.filter(i=>(S.cat==='todos'||i.cat===S.cat)&&(S.modo!=='domicilio'||domOK(i))).forEach(it=>{
@@ -41,11 +52,12 @@ function renderCatalog(){
     const left=avail(it.id,S.date,S.slot);
     const inDesign=it.id==='parcela'?(S.parcela?1:0):countOf(it.id);
     const stockB=left===0?'<span class="badge bad">Sin disponibilidad</span>':`<span class="badge ${left<=1?'warn':'ok'}">${left} disponible${left>1?'s':''} esa fecha</span>`;
-    el.innerHTML=`<div class="plan${it.img?' has-img':''}">${planSVG(it)}${it.img?`<img src="${esc(it.img)}" alt="${esc(it.name)}" loading="lazy" decoding="async" onerror="this.remove()">`:''}<small>${it.w} × ${it.d} m</small></div>
+    el.innerHTML=`<div class="plan${DK.galeria(it).length?' has-img':''}">${planSVG(it)}${fotosHTML(it)}<small>${it.w} × ${it.d} m</small></div>
       <div class="body"><h3>${esc(it.name)}</h3><p>${esc(it.desc)}</p>
       <div class="row"><span class="price num">${CLP(it.price)}<small> / evento</small></span>${stockB}</div>
       <div class="row"><span class="note">${S.modo==='domicilio'?(inDesign?'En tu pedido: '+inDesign:'No está en tu pedido'):(inDesign?'En tu diseño: '+inDesign:'No está en tu diseño')}</span>
       ${S.modo==='domicilio'?`<span class="qty"><button class="qtybtn" data-dm="${it.id}" aria-label="Quitar ${esc(it.name)}" ${inDesign?'':'disabled'}>−</button><b class="num">${inDesign}</b><button class="qtybtn" data-dp="${it.id}" aria-label="Agregar ${esc(it.name)}" ${inDesign>=left?'disabled':''}>+</button></span>`:`<button class="btn sm primary" data-add="${it.id}" ${left===0?'disabled':''}>${it.id==='parcela'?(S.parcela?'Quitar':'Agregar'):'Agregar al terreno'}</button>`}</div></div>`;
+    el.querySelectorAll('.galeria').forEach(gl=>gl.addEventListener('scroll',()=>galPuntos(gl),{passive:true}));
     g.appendChild(el);
   });
   $$('[data-dp]').forEach(b=>b.onclick=()=>addDom(b.dataset.dp));

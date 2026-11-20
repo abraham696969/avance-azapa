@@ -32,7 +32,7 @@ export const PARSERS = {
 
 // ---------- Tablas que el panel puede modificar: columnas y acciones permitidas ----------
 const CAT_COLS = ['item_id', 'nombre', 'descripcion', 'categoria', 'precio', 'stock', 'ancho', 'largo', 'alto', 'color', 'color_tope',
-  'forma', 'activo', 'imagen', 'modelo3d', 'modelo_rot', 'domicilio', 'orden'];
+  'forma', 'activo', 'imagen', 'modelo3d', 'modelo_rot', 'domicilio', 'orden', 'fotos'];
 const CLI_COLS = ['apoderado', 'nino', 'nacimiento', 'celular', 'correo', 'arrendo', 'fecha_evento', 'monto', 'notas'];
 const OFE_COLS = ['titulo', 'texto', 'hasta', 'activa'];
 const TABLES = {
