@@ -93,13 +93,16 @@ let curImg='',curModel='';
 let fotos=[];   // fotos adicionales: {url} ya guardadas o {blob,prev} por subir
 function showFotos(){$('#sFotosList').innerHTML=fotos.map((f,k)=>`<span class="foto-mini"><img class="thumb" src="${esc(f.url||f.prev)}" alt="Foto ${k+1}"><button type="button" class="btn sm ghost" data-fdel="${k}" aria-label="Quitar foto ${k+1}">×</button></span>`).join('');
   $$('[data-fdel]').forEach(b=>b.onclick=()=>{fotos.splice(+b.dataset.fdel,1);showFotos()})}
+let procFotos=0;   // fotos que se están preparando (reduciendo) en este momento
 $('#sFotos').addEventListener('change',async e=>{
-  const err=$('#sErr');err.hidden=true;
+  const err=$('#sErr');err.hidden=true;procFotos++;$('#sSave').disabled=true;
+  try{
   for(const f of [...e.target.files]){
     if(fotos.length>=DK.MAX_FOTOS){err.textContent='Máximo '+DK.MAX_FOTOS+' fotos adicionales por servicio.';err.hidden=false;break}
     if(f.size>15*1024*1024){err.textContent='Una foto pesa demasiado (máximo 15 MB).';err.hidden=false;continue}
     try{const r=await DK.resizeImage(f,1000);fotos.push({blob:r.blob,prev:r.dataUrl})}catch(ex){err.textContent=ex.message;err.hidden=false}
   }
+  }finally{procFotos--;if(!procFotos)$('#sSave').disabled=false}
   e.target.value='';showFotos();
 });
 function showImg(src){const p=$('#sImgPrev');if(src){p.src=src;p.hidden=false}else{p.removeAttribute('src');p.hidden=true}$('#sImgDel').hidden=!src}
@@ -131,21 +134,24 @@ $('#sCancel').onclick=clearForm;
 $('#svcForm').addEventListener('submit',e=>{
   e.preventDefault();const err=$('#sErr');err.hidden=true;
   const name=$('#sName').value.trim(),price=Math.round(+$('#sPrice').value),stock=Math.round(+$('#sStock').value),w=+$('#sW').value,d=+$('#sD').value,h=+$('#sH').value;
-  const bad=!name||name.length<3?'Escribe el nombre del servicio (mínimo 3 letras).':!(price>=0)||$('#sPrice').value===''?'Escribe el precio.':!(stock>=0)||$('#sStock').value===''?'Escribe cuántas unidades hay.':!(w>=.3&&w<=30&&d>=.3&&d<=20)?'Las medidas deben ser reales: ancho hasta 30 m y largo hasta 20 m.':!(h>=.2&&h<=8)?'El alto debe estar entre 0,2 y 8 m.':'';
+  const bad=!name||name.length<3?'Escribe el nombre del servicio (mínimo 3 letras).':!(price>=0)||$('#sPrice').value===''?'Escribe el precio.':!(stock>=0)||$('#sStock').value===''?'Escribe cuántas unidades hay.':!(w>=.3&&w<=30&&d>=.3&&d<=20)?'Las medidas deben ser reales: ancho hasta 30 m y largo hasta 20 m.':!($('#sId').value==='parcela'?h>=0&&h<=8:h>=.2&&h<=8)?'El alto debe estar entre 0,2 y 8 m.':'';
   if(bad){err.textContent=bad;err.hidden=false;return}
+  if(procFotos){err.textContent='Espera a que terminen de cargar las fotos.';err.hidden=false;return}
   let id=$('#sId').value;
   if(!id){id='s-'+name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)+'-'+Math.random().toString(36).slice(2,5)}
   const old=byId(id)||{};
   const it=Object.assign({},old,{id,name,desc:$('#sDesc').value.trim(),cat:$('#sCat').value,shape:old.id==='parcela'?'land':$('#sShape').value,price,stock,w,d,h,color:parseInt($('#sColor').value.slice(1),16),top:old.top!=null?old.top:0xffffff,active:true});
   it.modelRot=+$('#sModelRot').value||0;
   it.domicilio=it.id==='parcela'?false:$('#sDom').checked;
+  // se copian los archivos elegidos: si mientras se sube se abre otro servicio, el formulario cambia
+  const img=pImg,model=pModel,lista=fotos.slice(),editando=$('#sId').value;
   doAct(async()=>{
     const sv=$('#sSave');sv.disabled=true;
     try{
-      if(pImg==='quitar')it.img='';else if(pImg)it.img=await API.uploadFile('img',pImg,id);
-      if(pModel==='quitar')it.model='';else if(pModel){it.model=await API.uploadFile('model',pModel,id)}
-      const urls=[];for(const f of fotos)urls.push(f.url||await API.uploadFile('img',f.blob,id));it.fotos=urls;
-      await API.saveService(it);clearForm();
+      if(img==='quitar')it.img='';else if(img)it.img=await API.uploadFile('img',img,id);
+      if(model==='quitar')it.model='';else if(model){it.model=await API.uploadFile('model',model,id)}
+      const urls=[];for(const f of lista)urls.push(f.url||await API.uploadFile('img',f.blob,id));it.fotos=urls;
+      await API.saveService(it);if($('#sId').value===editando)clearForm();
     }finally{sv.disabled=false}
   },old.id?'Servicio actualizado':'Servicio agregado');
 });

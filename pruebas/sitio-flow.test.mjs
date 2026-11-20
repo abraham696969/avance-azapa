@@ -103,6 +103,11 @@ assert.equal(await card.locator('.galeria img').count(), 3); assert.equal(await 
 assert.equal(await card.locator('.gal-btn').count(), 2);   // flechas para computador (en pantallas táctiles se desliza con el dedo)
 await card.locator('.galeria').evaluate((g) => g.scrollTo({ left: g.clientWidth })); await p.waitForTimeout(700);
 assert.equal(await card.locator('.gal-dots i').nth(1).getAttribute('class'), 'on'); ok('en el catálogo las 3 fotos se deslizan hacia el lado y los puntos marcan la foto visible');
+await a.click('[data-edit="parcela"]'); await a.waitForTimeout(300);
+await a.setInputFiles('#sFotos', [{ name: 'p1.png', mimeType: 'image/png', buffer: png }]);
+await a.click('#sSave'); await a.waitForTimeout(1500);
+assert.equal((await db("select jsonb_array_length(fotos) as n from catalogo where item_id = 'parcela'"))[0].n, 1, await a.textContent('#sErr'));
+ok('la parcela (alto 0) se puede editar y guardar desde el panel, y el guardado espera a que estén listas las fotos');
 assert((await p.textContent('#catalog')).includes('Cancha inflable'));
 await a.click('[data-del="cancha"]'); await a.waitForTimeout(700);
 assert.equal((await db("select activo from catalogo where item_id = 'cancha'"))[0].activo, false);
