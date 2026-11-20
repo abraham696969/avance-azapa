@@ -22,6 +22,9 @@ for (const ruta of ['/server/index.mjs', '/schema.sql', '/package.json', '/prueb
 ok('no se entregan el código del servidor, el esquema, las pruebas ni archivos internos');
 r = await c('GET', '/config.js');
 assert(r.datos.toString().includes('SERVIDOR:true,PAGO_ONLINE:true,PAGO_PRUEBAS:true')); ok('config.js avisa al sitio que hay servidor y pago en Flow (ambiente de pruebas)');
+r = await c('GET', '/app.js', undefined, { headers: { 'accept-encoding': 'gzip' } });
+assert.equal(r.headers.get('content-encoding'), 'gzip'); assert(r.datos.toString().includes('function renderCatalog'));
+ok('el HTML, el CSS y el JavaScript se envían comprimidos (gzip) y el navegador los lee bien');
 
 // --- público: catálogo y disponibilidad sin datos personales ---
 r = await c('POST', '/api/reservas', reserva());

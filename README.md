@@ -56,4 +56,4 @@ El detalle de cada versión está en el historial de este repositorio.
 
 ## Pruebas automáticas
 
-Necesitan Node.js, Playwright y PGlite (PostgreSQL en memoria). Cada prueba se corre con `node pruebas/<nombre>.test.mjs`; la lista completa y su propósito están en [INSTRUCCIONES.md](INSTRUCCIONES.md#pruebas-automáticas-opcional-para-quien-programe). Son 13 suites con 275 comprobaciones; el servidor se prueba con una base PostgreSQL real en memoria y un Flow simulado que, como el real, rechaza correos no válidos.
+Necesitan Node.js, Playwright y PGlite (PostgreSQL en memoria). Cada prueba se corre con `node pruebas/<nombre>.test.mjs`; la lista completa y su propósito están en [INSTRUCCIONES.md](INSTRUCCIONES.md#pruebas-automáticas-opcional-para-quien-programe). Son 13 suites con 276 comprobaciones; el servidor se prueba con una base PostgreSQL real en memoria y un Flow simulado que, como el real, rechaza correos no válidos.

@@ -10,6 +10,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -370,8 +371,13 @@ export async function crearApp({ db, env = process.env, log = console }) {
       cuerpo = Buffer.concat([cuerpo, Buffer.from(`\nwindow.DK_CONFIG=Object.assign(window.DK_CONFIG||{},{SERVIDOR:true,PAGO_ONLINE:${flow.activo},PAGO_PRUEBAS:${flow.pruebas}});\n`)]);
     }
     const ext = path.extname(nombre);
-    res.writeHead(200, { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Cache-Control': ext === '.png' ? 'public, max-age=86400' : 'no-cache',
-      'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' });
+    const cab = { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Cache-Control': ext === '.png' ? 'public, max-age=86400' : 'no-cache',
+      'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', Vary: 'Accept-Encoding' };
+    // HTML, CSS y JavaScript se envían comprimidos (gzip) si el navegador lo acepta: carga más rápida en celulares
+    if (['.html', '.css', '.js'].includes(ext) && /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) {
+      cuerpo = zlib.gzipSync(cuerpo, { level: 6 }); cab['Content-Encoding'] = 'gzip';
+    }
+    res.writeHead(200, cab);
     return res.end(M === 'HEAD' ? undefined : cuerpo);
   }
 
