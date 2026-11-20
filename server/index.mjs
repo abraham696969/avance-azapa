@@ -247,12 +247,13 @@ export async function crearApp({ db, env = process.env, log = console }) {
     if (p === '/api/reservas' && M === 'POST') {
       const a = await leerJSON(req);
       const r = await unaFila(`select crear_reserva($1::date, $2, $3, $4, $5, $6::integer, $7::jsonb, $8::boolean, $9::jsonb, $10, $11, $12::boolean,
-        $13, $14::date, $15::boolean, $16, $17::jsonb, $18) as r`, [
+        $13, $14::date, $15::boolean, $16, $17::jsonb, $18, $19::boolean, $20) as r`, [
         a.p_fecha ?? null, a.p_franja ?? null, a.p_nombre ?? null, a.p_email ?? null, a.p_telefono ?? null,
         a.p_invitados ?? null, JSON.stringify(a.p_items ?? {}), a.p_parcela ?? true, JSON.stringify(a.p_layout ?? []),
         a.p_metodo ?? null, a.p_transaccion ?? null, !!a.p_online && flow.activo,
         a.p_nino ?? null, a.p_nacimiento || null, !!a.p_acepta,
-        a.p_modalidad ?? 'parcela', a.p_lugar == null ? null : JSON.stringify(a.p_lugar), a.p_zona ?? null]);
+        a.p_modalidad ?? 'parcela', a.p_lugar == null ? null : JSON.stringify(a.p_lugar), a.p_zona ?? null,
+        !!a.p_decoracion, a.p_decoracion ? (a.p_decoracion_detalle ?? null) : null]);
       return enviar(res, 200, r.r);
     }
     if (p === '/api/reservas/estado' && M === 'GET') {

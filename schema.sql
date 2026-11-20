@@ -82,6 +82,9 @@ alter table public.reservas add  constraint reservas_modalidad_check check (moda
 alter table public.reservas add column if not exists lugar  jsonb;                      -- datos del lugar: dirección, suelo, medidas, acceso, luz, agua...
 alter table public.reservas add column if not exists flete  integer not null default 0 check (flete >= 0);
 alter table public.reservas add column if not exists zona   text;
+-- decoración pedida por el cliente (el equipo la coordina y la cotiza con el cliente)
+alter table public.reservas add column if not exists decoracion         boolean not null default false;
+alter table public.reservas add column if not exists decoracion_detalle text;
 
 -- estados: por_pagar (esperando el pago en Flow), pendiente (el equipo debe validar), confirmada, finalizada, cancelada
 alter table public.reservas drop constraint if exists reservas_estado_check;
@@ -125,11 +128,14 @@ insert into public.catalogo (item_id,nombre,descripcion,categoria,precio,stock,a
   ('completos','Máquina de completos','Completos armados al instante.','comida',35000,2,1.4,1.1,1.6,'#e0402f','#ffc21a','machine',true,80),
   ('piscinaS','Piscina chica','Diámetro 3 m, para los más pequeños.','piscinas',20000,3,3,3,0.6,'#39a0ff',null,'pool',true,90),
   ('piscinaL','Piscina grande','Diámetro 5 m, hasta 12 niños.','piscinas',35000,2,5,5,0.8,'#1f86e8',null,'pool',true,100),
-  ('parcela','Arriendo de la parcela','Recinto completo de 30 × 20 m con cerco, quincho y árboles.','local',150000,1,30,20,0,'#7ccf7a',null,'land',true,110)
+  ('parcela','Arriendo de la parcela','Recinto completo de 30 × 20 m con cerco, quincho y árboles.','local',300000,1,30,20,0,'#7ccf7a',null,'land',true,110)
 on conflict (item_id) do update set
   descripcion = excluded.descripcion, categoria = excluded.categoria, ancho = excluded.ancho, largo = excluded.largo,
   alto = excluded.alto, color = excluded.color, color_tope = excluded.color_tope, forma = excluded.forma, orden = excluded.orden
   where public.catalogo.descripcion is null;   -- solo completa filas de una versión anterior; no pisa lo que editaste
+-- Precio de la parcela definido por la empresa (noviembre 2026): $300.000. Solo cambia el valor inicial
+-- anterior ($150.000); si ya se editó desde el panel, no se toca.
+update public.catalogo set precio = 300000 where item_id = 'parcela' and precio = 150000;
 
 -- ---------- Funciones del negocio ----------
 -- ¿la reserva ocupa cupo? (las "por_pagar" lo ocupan solo hasta que vence su plazo)
@@ -149,6 +155,10 @@ language sql stable as $$
 $$;
 
 -- Crear reserva: la base recalcula precios y valida disponibilidad (no confía en el navegador).
+-- Horario (noviembre 2026): un solo turno por día. Parcela de 15:00 a 20:00 (se puede llegar desde las 13:00
+-- para preparar). Domicilio: entrega desde las 12:00 y retiro a la hora que elige el cliente, a más tardar 21:00.
+-- Por eso el cupo, el stock y la parcela se cuentan por día (franja 'tarde'; las reservas antiguas de 'manana' siguen contando).
+drop function if exists public.crear_reserva(date, text, text, text, text, integer, jsonb, boolean, jsonb, text, text, boolean, text, date, boolean, text, jsonb, text);
 -- p_online = true  -> queda "por_pagar" (30 min de plazo) y se paga en Flow
 -- p_online = false -> queda "pendiente" y el equipo valida el abono a mano
 create or replace function public.crear_reserva(
@@ -156,7 +166,8 @@ create or replace function public.crear_reserva(
   p_invitados integer, p_items jsonb, p_parcela boolean, p_layout jsonb,
   p_metodo text, p_transaccion text, p_online boolean default false,
   p_nino text default null, p_nacimiento date default null, p_acepta boolean default false,
-  p_modalidad text default 'parcela', p_lugar jsonb default null, p_zona text default null
+  p_modalidad text default 'parcela', p_lugar jsonb default null, p_zona text default null,
+  p_decoracion boolean default false, p_decoracion_detalle text default null
 ) returns jsonb
 language plpgsql as $$
 declare
@@ -166,7 +177,7 @@ declare
 begin
   if coalesce(p_modalidad,'parcela') not in ('parcela','domicilio') then raise exception 'Modalidad no válida.'; end if;
   v_parcela := case when v_dom then false else coalesce(p_parcela, true) end;
-  if p_franja not in ('manana','tarde') then raise exception 'Franja horaria no válida.'; end if;
+  if p_franja is distinct from 'tarde' then raise exception 'Horario no válido.'; end if;
   if p_fecha is null or p_fecha <= current_date then raise exception 'Elige una fecha futura.'; end if;
   if length(trim(coalesce(p_nombre,''))) < 3 then raise exception 'Escribe tu nombre.'; end if;
   if coalesce(p_email,'') !~ '^\S+@\S+\.\S+$' then raise exception 'Correo no válido.'; end if;
@@ -177,9 +188,12 @@ begin
   if p_nacimiento is null or p_nacimiento > current_date or p_nacimiento < current_date - interval '25 years' then
     raise exception 'La fecha de nacimiento del niño o niña no es válida.'; end if;
   if not coalesce(p_acepta,false) then raise exception 'Debes aceptar el uso de los datos para continuar.'; end if;
+  if coalesce(p_decoracion,false) and length(trim(coalesce(p_decoracion_detalle,''))) < 3 then
+    raise exception 'Cuéntanos qué decoración quieres (temática, colores o personaje).'; end if;
+  if length(coalesce(p_decoracion_detalle,'')) > 300 then raise exception 'La descripción de la decoración es demasiado larga.'; end if;
 
-  -- Evita dos reservas simultáneas para la misma fecha y franja
-  perform pg_advisory_xact_lock(hashtext(p_fecha::text || p_franja));
+  -- Evita dos reservas simultáneas para la misma fecha
+  perform pg_advisory_xact_lock(hashtext(p_fecha::text));
 
   if exists (select 1 from public.fechas_bloqueadas where fecha = p_fecha and aplica in ('todo', coalesce(p_modalidad,'parcela'))) then
     raise exception 'Esa fecha está bloqueada. Elige otra.';
@@ -192,12 +206,14 @@ begin
     if coalesce((p_lugar ->> 'ancho')::numeric, 0) not between 1 and 200 or coalesce((p_lugar ->> 'largo')::numeric, 0) not between 1 and 200 then
       raise exception 'Indica las medidas del espacio (ancho y largo en metros).'; end if;
     if length(coalesce(p_lugar::text,'')) > 3000 then raise exception 'Los datos del lugar son demasiado largos.'; end if;
+    if coalesce(p_lugar ->> 'retiro','') not in ('15:00','16:00','17:00','18:00','19:00','20:00','21:00') then
+      raise exception 'Elige la hora de retiro de los juegos (a más tardar 21:00).'; end if;
     select precio into v_flete from public.zonas_despacho where id = p_zona and activa;
     if not found then raise exception 'Elige la zona de despacho.'; end if;
   end if;
-  if not v_dom and exists (select 1 from public.reservas r where r.fecha = p_fecha and r.franja = p_franja
+  if not v_dom and exists (select 1 from public.reservas r where r.fecha = p_fecha
              and r.parcela and public.reserva_vigente(r.estado, r.expira)) then
-    raise exception 'La parcela ya fue reservada en esa franja. Elige otra fecha o franja.';
+    raise exception 'La parcela ya fue reservada ese día. Elige otra fecha.';
   end if;
 
   for v_key, v_qty in
@@ -208,9 +224,9 @@ begin
     if not found then raise exception 'El servicio "%" ya no está disponible.', v_key; end if;
     select coalesce(sum((r.items ->> v_key)::integer), 0) into v_usado
       from public.reservas r
-      where r.fecha = p_fecha and r.franja = p_franja and public.reserva_vigente(r.estado, r.expira);
+      where r.fecha = p_fecha and public.reserva_vigente(r.estado, r.expira);
     if v_usado + v_qty > v_cat.stock then
-      raise exception 'Ya no quedan suficientes "%" para esa fecha y franja.', v_cat.nombre;
+      raise exception 'Ya no quedan suficientes "%" para esa fecha.', v_cat.nombre;
     end if;
     v_total := v_total + v_cat.precio * v_qty;
   end loop;
@@ -228,13 +244,14 @@ begin
 
   insert into public.reservas (folio, fecha, franja, nombre, email, telefono, invitados, items, parcela, layout,
                                total, abono, metodo_pago, transaccion, estado, expira, nombre_nino, nacimiento_nino, acepta_datos,
-                               modalidad, lugar, flete, zona)
+                               modalidad, lugar, flete, zona, decoracion, decoracion_detalle)
   values (v_folio, p_fecha, p_franja, trim(p_nombre), trim(p_email), trim(p_telefono), p_invitados,
           coalesce(p_items,'{}'::jsonb), v_parcela, case when v_dom then '[]'::jsonb else coalesce(p_layout,'[]'::jsonb) end,
           v_total, v_abono, p_metodo, p_transaccion, v_estado,
           case when v_estado = 'por_pagar' then now() + interval '30 minutes' end,
           trim(p_nino), p_nacimiento, true,
-          coalesce(p_modalidad,'parcela'), case when v_dom then p_lugar end, v_flete, case when v_dom then p_zona end)
+          coalesce(p_modalidad,'parcela'), case when v_dom then p_lugar end, v_flete, case when v_dom then p_zona end,
+          coalesce(p_decoracion,false), case when coalesce(p_decoracion,false) then trim(p_decoracion_detalle) end)
   returning codigo into v_codigo;
 
   return jsonb_build_object('folio', v_folio, 'codigo', v_codigo, 'total', v_total, 'abono', v_abono, 'estado', v_estado);
@@ -269,7 +286,7 @@ begin
     end if;
     -- ¿el cupo se perdió mientras tanto? (pago tardío, reserva ya vencida o cancelada)
     if r.estado = 'cancelada' or (r.estado = 'por_pagar' and r.expira <= now() and exists (
-         select 1 from public.reservas o where o.id <> r.id and o.fecha = r.fecha and o.franja = r.franja
+         select 1 from public.reservas o where o.id <> r.id and o.fecha = r.fecha
            and o.parcela and r.parcela and public.reserva_vigente(o.estado, o.expira))) then
       update public.reservas set estado = 'pendiente', flow_orden = p_flow_orden, pagada_en = now(),
         nota = 'Pago recibido pero el cupo ya no estaba disponible: contactar al cliente o reembolsar.' where id = r.id;

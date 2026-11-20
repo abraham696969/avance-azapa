@@ -110,7 +110,7 @@
     <h2 class="t-centro">Así de fácil</h2>
     <ol class="como">
       <li class="c-verde"><span class="n">1</span><b>Elige tus juegos</b><span>Mira precios, medidas y qué queda libre en tu fecha.</span><a href="#servicios">Ir al catálogo</a></li>
-      <li class="c-rosa"><span class="n">2</span><b>Escoge la fecha</b><span>La agenda solo te muestra lo disponible, mañana o tarde.</span><a href="#fecha">Ver la agenda</a></li>
+      <li class="c-rosa"><span class="n">2</span><b>Escoge la fecha</b><span>La agenda solo te muestra los días disponibles.</span><a href="#fecha">Ver la agenda</a></li>
       <li class="c-azul"><span class="n">3</span><b>Diseña en 3D</b><span>Arrastra los juegos sobre la parcela y mira si caben.</span><a href="#simulador">Abrir el simulador</a></li>
       <li class="c-amarillo"><span class="n">4</span><b>Reserva con abono</b><span>Pagas el 30 % y el resto el día de la fiesta.</span><a href="#reservar">Reservar</a></li>
     </ol>
@@ -151,16 +151,16 @@
 
 <!-- ================= ARMA TU FIESTA ================= -->
 <div class="page" data-page="fiesta" id="fiesta">
-  <header class="pbanner verde"><div class="wrap"><h1>Arma tu fiesta</h1><p>Elige el día y la franja, y distribuye los juegos en la parcela para ver cómo queda.</p></div></header>
+  <header class="pbanner verde"><div class="wrap"><h1>Arma tu fiesta</h1><p>Elige el día y distribuye los juegos en la parcela para ver cómo queda.</p></div></header>
   <section id="fecha" class="wrap">
     <div class="sec-head"><h2>¿Cuándo es la fiesta?</h2>
-      <p>La disponibilidad se calcula por servicio y franja. Una fecha ocupada no se puede reservar dos veces.</p></div>
+      <p>La parcela se arrienda de 15:00 a 20:00 y puedes llegar desde las 13:00 para preparar. A domicilio, entregamos desde las 12:00 y retiramos a la hora que elijas, hasta las 21:00.</p></div>
     <div class="agenda">
       <div class="panel">
         <div class="cal-head"><button class="btn sm" id="prevM" aria-label="Mes anterior">←</button><h3 id="monthT"></h3><button class="btn sm" id="nextM" aria-label="Mes siguiente">→</button></div>
         <div class="cal" id="cal"></div>
         <div class="legend">
-          <span><i class="dots"><i></i></i> Franja libre</span><span><i class="dots"><i class="x"></i></i> Franja ocupada</span>
+          <span><i class="dots"><i></i></i> Día libre</span><span><i class="dots"><i class="x"></i></i> Día ocupado</span>
           <span>Rayado: fecha bloqueada</span>
         </div>
       </div>
@@ -168,7 +168,7 @@
         <p class="eyebrow">Fecha elegida</p>
         <h3 id="dateT" style="text-transform:capitalize;margin-top:4px"></h3>
         <div class="slots" id="slots"></div>
-        <p class="eyebrow" style="margin-bottom:8px">Disponible en esta franja</p>
+        <p class="eyebrow" style="margin-bottom:8px">Disponible ese día</p>
         <div class="avail num" id="avail"></div>
       </div>
     </div>
@@ -250,6 +250,10 @@
               <div class="field"><label for="lLuz">¿Hay enchufe de 220 V cerca?</label><select id="lLuz"><option value="">Elige…</option><option value="si">Sí</option><option value="no">No</option></select></div>
               <div class="field"><label for="lAgua">¿Hay agua cerca?</label><select id="lAgua"><option value="">Elige…</option><option value="si">Sí</option><option value="no">No</option></select></div>
             </div>
+            <div class="two">
+              <div class="field"><label>Entrega y montaje</label><p class="note" style="margin:6px 0 0">Desde las 12:00. El equipo te confirma la hora exacta.</p></div>
+              <div class="field"><label for="lRetiro">Hora de retiro</label><select id="lRetiro"><option value="">Elige…</option></select></div>
+            </div>
             <div class="field"><label for="lObs">Otros detalles (opcional)</label><textarea id="lObs" rows="2" maxlength="400" placeholder="Mascotas, horario de acceso, árboles, cables, estacionamiento…"></textarea></div>
           </fieldset>
           <div class="field"><label for="cName">Nombre</label><input id="cName" autocomplete="name" placeholder="Nombre y apellido"></div>
@@ -262,6 +266,9 @@
             <div class="field"><label for="cKid">Nombre del niño o niña cumpleañero/a</label><input id="cKid" autocomplete="off" maxlength="60" placeholder="Ej.: Sofía"></div>
             <div class="field"><label for="cKidBirth">Su fecha de nacimiento</label><input id="cKidBirth" type="date"></div>
           </div>
+          <label class="check"><input type="checkbox" id="cDeco"> <span>Quiero decoración para la fiesta</span></label>
+          <div class="field" id="decoBox" hidden><label for="cDecoDet">¿Qué decoración quieres?</label><textarea id="cDecoDet" rows="2" maxlength="300" placeholder="Temática, colores o personaje. Ej.: Frozen, tonos lila y celeste"></textarea>
+            <p class="note">El equipo de Divertí Kids te contactará para coordinar la decoración y su valor.</p></div>
           <label class="check"><input type="checkbox" id="cConsent"> <span>Acepto que Divertí Kids guarde estos datos, incluidos los del niño o niña, para gestionar mi reserva y contactarme con propuestas de cumpleaños. Puedo pedir que los borren cuando quiera.</span></label>
           <p class="note" id="formErr" style="color:var(--bad);font-weight:600" hidden></p>
           <button class="btn primary" id="payBtn" type="submit">Pagar abono</button>

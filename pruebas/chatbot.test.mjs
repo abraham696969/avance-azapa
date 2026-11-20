@@ -21,7 +21,7 @@ const CASOS = [
   ['¿Cuánto me falta por pagar el día del evento?', ['saldo'], /70%/],
   ['¿Cómo hago una reserva?', ['reservar']],
   ['Quiero arrendar para el cumpleaños de mi hija', ['reservar']],
-  ['¿A qué hora parte la fiesta?', ['horario_franjas'], /10:00/],
+  ['¿A qué hora parte la fiesta?', ['horario_franjas'], /15:00/],
   ['¿Qué horarios tienen?', ['horario_franjas']],
   ['¿Cuántos castillos tienen?', ['stock'], /Castillo/],
   ['¿Tienen mesa de ping pong?', ['juegos']],

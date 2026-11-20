@@ -16,7 +16,7 @@ const r1 = await nueva(15);
 let r = await c('POST', '/api/pago', { folio: r1.folio, codigo: r1.codigo });
 assert.equal(r.status, 200); assert.match(r.datos.url, /\/pay\?token=TOK1$/);
 const creado = s.flow.log.find((x) => x.path === '/api/payment/create').params;
-assert.equal(creado.amount, String(r1.abono)); assert.equal(creado.amount, '78000'); assert.equal(creado.commerceOrder, r1.folio); assert.equal(creado.currency, 'CLP');
+assert.equal(creado.amount, String(r1.abono)); assert.equal(creado.amount, '123000'); assert.equal(creado.commerceOrder, r1.folio); assert.equal(creado.currency, 'CLP');
 assert.equal(creado.apiKey, FLOW_KEY); assert.equal(creado.urlConfirmation, `${s.url}/api/flow/confirmacion`); assert.equal(creado.urlReturn, `${s.url}/api/flow/retorno`);
 ok('crear pago: firma válida, monto (30 % de 260.000) tomado de la base y direcciones de aviso del servidor');
 assert.equal((await fila(r1.folio)).flow_token, 'TOK1'); ok('guarda el token de Flow en la reserva');
@@ -53,7 +53,7 @@ await c('POST', '/api/pago', { folio: r3.folio, codigo: r3.codigo });
 s.flow.monto = 1000;
 await c('POST', '/api/flow/confirmacion', 'token=TOK2', { sinDk: true });
 let f3 = await fila(r3.folio);
-assert.equal(f3.estado, 'pendiente'); assert.match(f3.nota, /pago de 1000 y el abono era 78000/); ok('si Flow informa otro monto, la reserva queda pendiente con una nota para revisar');
+assert.equal(f3.estado, 'pendiente'); assert.match(f3.nota, /pago de 1000 y el abono era 123000/); ok('si Flow informa otro monto, la reserva queda pendiente con una nota para revisar');
 s.flow.monto = null;
 const r4 = await nueva(18); await c('POST', '/api/pago', { folio: r4.folio, codigo: r4.codigo });
 s.flow.status = 4; await c('POST', '/api/flow/confirmacion', 'token=TOK3', { sinDk: true });
@@ -62,7 +62,7 @@ s.flow.status = 2;
 
 // Flow rechaza el correo: se explica al cliente y la fecha queda libre para reintentar
 const conCorreo = async (email) => (await c('POST', '/api/reservas', {
-  p_fecha: futura(17), p_franja: 'manana', p_nombre: 'Ana Pérez', p_email: email, p_telefono: '+56 9 1234 5678', p_invitados: 20,
+  p_fecha: futura(21), p_franja: 'tarde', p_nombre: 'Ana Pérez', p_email: email, p_telefono: '+56 9 1234 5678', p_invitados: 20,
   p_items: { papas: 1 }, p_parcela: true, p_layout: [], p_metodo: 'Flow', p_online: true, p_nino: 'Sofía', p_nacimiento: '2020-03-05', p_acepta: true })).datos;
 const rc = await conCorreo('ana@rechazado.cl');
 r = await c('POST', '/api/pago', { folio: rc.folio, codigo: rc.codigo });
@@ -72,7 +72,7 @@ const fc = await fila(rc.folio); assert.equal(fc.estado, 'cancelada'); assert.ma
 const rc2 = await conCorreo('ana@gmail.com');
 assert(rc2.folio && rc2.folio !== rc.folio, JSON.stringify(rc2));
 r = await c('POST', '/api/pago', { folio: rc2.folio, codigo: rc2.codigo }); assert.equal(r.status, 200);
-ok('el intento fallido no deja la fecha apartada: se corrige el correo y se reserva la misma franja');
+ok('el intento fallido no deja la fecha apartada: se corrige el correo y se reserva la misma fecha');
 
 
 // clave secreta equivocada

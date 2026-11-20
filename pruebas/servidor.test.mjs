@@ -25,10 +25,10 @@ assert(r.datos.toString().includes('SERVIDOR:true,PAGO_ONLINE:true,PAGO_PRUEBAS:
 
 // --- público: catálogo y disponibilidad sin datos personales ---
 r = await c('POST', '/api/reservas', reserva());
-assert.equal(r.status, 200); assert.equal(r.datos.estado, 'pendiente'); assert.equal(r.datos.total, 195000); assert.equal(r.datos.abono, 58500);
-ok('la reserva se crea y el total lo calcula la base (castillo 45.000 + parcela 150.000; abono 30 %)');
-r = await c('POST', '/api/reservas', reserva({ p_franja: 'manana', p_items: { castillo: 1 }, total: 1, abono: 1, precio: 1 }));
-assert.equal(r.datos.total, 195000); ok('aunque el navegador mande otros precios, la base los ignora');
+assert.equal(r.status, 200); assert.equal(r.datos.estado, 'pendiente'); assert.equal(r.datos.total, 345000); assert.equal(r.datos.abono, 103500);
+ok('la reserva se crea y el total lo calcula la base (castillo 45.000 + parcela 300.000; abono 30 %)');
+r = await c('POST', '/api/reservas', reserva({ p_fecha: futura(30), p_items: { castillo: 1 }, total: 1, abono: 1, precio: 1 }));
+assert.equal(r.datos.total, 345000); ok('aunque el navegador mande otros precios, la base los ignora');
 r = await c('GET', '/api/publico');
 assert.equal(r.status, 200); assert.equal(r.datos.catalogo.length, 11); assert.equal(typeof r.datos.catalogo[0].precio, 'number');
 assert.equal(r.datos.disponibilidad.length, 2);
@@ -36,10 +36,24 @@ assert.deepEqual(Object.keys(r.datos.disponibilidad[0]).sort(), ['fecha', 'franj
 assert(!JSON.stringify(r.datos).includes('ana@ejemplo.cl') && !JSON.stringify(r.datos).includes('Sofía'));
 ok('la disponibilidad pública solo dice fecha, franja y qué se arrendó: ningún dato de clientes');
 r = await c('POST', '/api/reservas', reserva());
-assert.equal(r.status, 400); assert.match(r.datos.error, /parcela ya fue reservada/); ok('no permite reservar la parcela dos veces en la misma franja');
+assert.equal(r.status, 400); assert.match(r.datos.error, /parcela ya fue reservada/); ok('no permite reservar la parcela dos veces el mismo día');
+r = await c('POST', '/api/reservas', reserva({ p_fecha: futura(31), p_franja: 'manana' }));
+assert.equal(r.status, 400); assert.match(r.datos.error, /Horario no válido/); ok('hay un solo horario por día: la base rechaza la franja de la mañana');
+r = await c('POST', '/api/reservas', reserva({ p_fecha: futura(31), p_decoracion: true, p_decoracion_detalle: '' }));
+assert.equal(r.status, 400); assert.match(r.datos.error, /qué decoración quieres/); ok('si pide decoración, debe decir cuál');
+r = await c('POST', '/api/reservas', reserva({ p_fecha: futura(31), p_decoracion: true, p_decoracion_detalle: 'Frozen, tonos lila y celeste' }));
+assert.equal(r.status, 200); assert.equal(r.datos.total, 345000);
+{ const d = (await s.db.query('select decoracion, decoracion_detalle from reservas where folio = $1', [r.datos.folio])).rows[0];
+  assert.equal(d.decoracion, true); assert.equal(d.decoracion_detalle, 'Frozen, tonos lila y celeste'); }
+ok('la decoración pedida se guarda con su detalle y no cambia el total (se coordina aparte)');
+r = await c('POST', '/api/reservas', reserva({ p_fecha: futura(32), p_decoracion: false, p_decoracion_detalle: 'no debería guardarse' }));
+assert.equal((await s.db.query('select decoracion, decoracion_detalle from reservas where folio = $1', [r.datos.folio])).rows[0].decoracion_detalle, null);
+ok('sin decoración no se guarda ningún detalle');
 r = await c('POST', '/api/reservas', reserva({ p_fecha: futura(13), p_acepta: false }));
 assert.equal(r.status, 400); assert.match(r.datos.error, /aceptar el uso de los datos/); ok('sin el consentimiento del apoderado no se puede reservar');
-const lugar = { tipo: 'casa', direccion: 'Pasaje Los Olivos 123, Arica', suelo: 'pasto', ancho: 10, largo: 8, luz: 'si', agua: 'si' };
+const lugar = { tipo: 'casa', direccion: 'Pasaje Los Olivos 123, Arica', suelo: 'pasto', ancho: 10, largo: 8, luz: 'si', agua: 'si', retiro: '20:00' };
+r = await c('POST', '/api/reservas', reserva({ p_modalidad: 'domicilio', p_zona: 'azapa', p_lugar: { ...lugar, retiro: '22:00' }, p_items: { castillo: 1 } }));
+assert.equal(r.status, 400); assert.match(r.datos.error, /hora de retiro/); ok('a domicilio exige la hora de retiro, a más tardar 21:00');
 r = await c('POST', '/api/reservas', reserva({ p_modalidad: 'domicilio', p_zona: 'azapa', p_lugar: lugar, p_items: { castillo: 1 } }));
 assert.equal(r.status, 200); assert.equal(r.datos.total, 60000);
 const dom = (await s.db.query('select parcela, flete, zona, lugar from reservas where folio = $1', [r.datos.folio])).rows[0];
@@ -69,7 +83,7 @@ assert(/HttpOnly/.test(sc) && /SameSite=Strict/.test(sc)); ok('al entrar se crea
 assert.equal((await s.db.query('select count(*)::int as n from sesiones where token_hash = $1', [sc.split(';')[0].split('=')[1]])).rows[0].n, 0);
 ok('en la base se guarda solo un resumen de la sesión, no el código');
 r = await c('GET', '/api/admin/datos');
-assert.equal(r.status, 200); assert.equal(r.datos.reservas.length, 4);
+assert.equal(r.status, 200); assert.equal(r.datos.reservas.length, 6);
 assert(r.datos.reservas.every((x) => !('codigo' in x) && !('flow_token' in x))); assert.equal(r.datos.reservas[0].nombre_nino, 'Sofía');
 ok('con sesión se ven las reservas con los datos del niño, sin los códigos internos del pago');
 
@@ -79,14 +93,14 @@ assert.equal(r.status, 403); ok('un cambio sin la cabecera propia del sitio se r
 r = await c('POST', '/api/admin/reservas', { accion: 'update', fila: { estado: 'confirmada', total: 1 }, clave: folio });
 assert.equal(r.status, 200);
 const fila = (await s.db.query('select estado, total from reservas where folio = $1', [folio])).rows[0];
-assert.equal(fila.estado, 'confirmada'); assert.equal(fila.total, 195000); ok('el panel cambia el estado, pero no puede tocar el monto');
+assert.equal(fila.estado, 'confirmada'); assert.equal(fila.total, 345000); ok('el panel cambia el estado, pero no puede tocar el monto');
 r = await c('POST', '/api/admin/reservas', { accion: 'update', fila: { estado: 'regalada' }, clave: folio });
 assert.equal(r.status, 400); ok('un estado inexistente se rechaza');
 r = await c('POST', '/api/admin/reservas', { accion: 'delete', clave: folio });
 assert.equal(r.status, 400); r = await c('POST', '/api/admin/admins', { accion: 'insert', fila: { email: 'x@y.cl', clave_hash: 'x' } });
 assert.equal(r.status, 404); ok('no se pueden borrar reservas ni tocar tablas fuera de la lista (administradores, sesiones)');
 r = await c('POST', '/api/admin/catalogo', { accion: 'upsert', fila: { item_id: 'trampolin', nombre: 'Trampolín', precio: 28000, stock: 2, ancho: 3, largo: 3, alto: 1.2, color: '#ff0000', forma: 'box', categoria: 'juegos', 'precio"; drop table reservas; --': 1 } });
-assert.equal(r.status, 200); assert.equal((await s.db.query('select count(*)::int as n from reservas')).rows[0].n, 4);
+assert.equal(r.status, 200); assert.equal((await s.db.query('select count(*)::int as n from reservas')).rows[0].n, 6);
 ok('crear un servicio funciona y las columnas desconocidas se ignoran (no hay inyección SQL)');
 r = await c('POST', '/api/admin/catalogo', { accion: 'update', fila: { activo: false }, clave: 'trampolin' });
 assert.equal((await c('GET', '/api/publico')).datos.catalogo.some((x) => x.item_id === 'trampolin'), false); ok('ocultar un servicio lo saca del sitio público');

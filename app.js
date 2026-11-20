@@ -19,7 +19,7 @@ const dsgn=()=>S.modo==='domicilio'?DESIGN.filter(domOK):DESIGN;   // servicios 
 function used(id,ds,slot){let n=0;DB.res.forEach(r=>{if(r.date===ds&&r.slot===slot&&r.status!=='cancelada'){if(id==='parcela'){if(r.parcela)n++}else n+=r.items[id]||0}});return n}
 function avail(id,ds,slot){if(blockedDay(ds))return 0;return Math.max(0,byId(id).stock-used(id,ds,slot))}
 function slotFree(ds,slot){if(S.modo==='domicilio')return !blockedDay(ds)&&DESIGN.some(it=>domOK(it)&&avail(it.id,ds,slot)>0);return avail('parcela',ds,slot)>0}
-function dayState(ds){if(blockedDay(ds))return 'blocked';const f=Object.keys(SLOTS).filter(s=>slotFree(ds,s)).length;return f===0?'full':(f===2?'free':'partial')}
+function dayState(ds){if(blockedDay(ds))return 'blocked';const f=Object.keys(SLOTS).filter(s=>slotFree(ds,s)).length;return f===0?'full':(f===Object.keys(SLOTS).length?'free':'partial')}
 (function pickDefault(){for(let i=7;i<60;i++){const d=addDays(today,i);if(d.getDay()===6&&dayState(iso(d))==='free'){S.date=iso(d);S.month=new Date(d.getFullYear(),d.getMonth(),1);return}}S.date=iso(addDays(today,8))})();
 
 /* ---------- catálogo ---------- */
@@ -80,7 +80,7 @@ function renderSlots(){
   Object.entries(SLOTS).forEach(([k,v])=>{
     const free=slotFree(S.date,k);
     const b=document.createElement('button');b.className='slot';b.disabled=!free;b.setAttribute('aria-pressed',S.slot===k);
-    b.innerHTML=`<b>${v.n}</b><span class="note num">${v.h}</span><span class="badge ${free?'ok':'bad'}" style="align-self:flex-start;margin-top:4px">${free?'Disponible':'Ocupada'}</span>`;
+    b.innerHTML=`<b>${v.n}</b><span class="note num">${esc(DK.horarioTxt(S.modo,readLugar()))}</span><span class="badge ${free?'ok':'bad'}" style="align-self:flex-start;margin-top:4px">${free?'Disponible':'Ocupada'}</span>`;
     b.onclick=()=>{S.slot=k;refreshAll()};s.appendChild(b);
   });
   const a=$('#avail');a.innerHTML='';
@@ -258,11 +258,11 @@ function spawn(id,x,z,rot){
 }
 function addItem(id){
   const it=byId(id);
-  if(countOf(id)>=avail(id,S.date,S.slot)){toast('No quedan más "'+it.name+'" para esa fecha y franja');return false}
+  if(countOf(id)>=avail(id,S.date,S.slot)){toast('No quedan más "'+it.name+'" para esa fecha');return false}
   const sp=findSpot(it);if(!sp){toast('No hay espacio libre en el terreno');return false}
   const uid=spawn(id,sp[0],sp[1],0);select(uid);refreshAll();return true;
 }
-function addDom(id){const it=byId(id);if((S.qty[id]||0)>=avail(id,S.date,S.slot)){toast('No quedan más "'+it.name+'" para esa fecha y franja');return false}S.qty[id]=(S.qty[id]||0)+1;refreshAll();return true}
+function addDom(id){const it=byId(id);if((S.qty[id]||0)>=avail(id,S.date,S.slot)){toast('No quedan más "'+it.name+'" para esa fecha');return false}S.qty[id]=(S.qty[id]||0)+1;refreshAll();return true}
 function removeUid(uid){const i=S.placed.findIndex(p=>p.uid===uid);if(i<0)return;scene&&scene.remove(S.placed[i].mesh);S.placed.splice(i,1);if(S.sel===uid)S.sel=null;refreshAll()}
 function select(uid){if(S.sel){const o=S.placed.find(p=>p.uid===S.sel);o&&setEmissive(o.mesh,0)}S.sel=uid;if(uid){const o=S.placed.find(p=>p.uid===uid);setEmissive(o.mesh,0x444422)}
   const o=S.placed.find(p=>p.uid===S.sel);$('#selName').textContent=o?byId(o.id).name:'Ninguno';['#rotL','#rotR','#delSel'].forEach(s=>$(s).disabled=!o);render()}
@@ -320,7 +320,7 @@ function quote(){
 }
 function issues(){
   const out=[];
-  if(!slotFree(S.date,S.slot))out.push(S.modo==='domicilio'?'Esa franja no tiene servicios disponibles. Cambia de fecha o de franja.':'La parcela está ocupada en la franja elegida. Cambia de fecha o de franja.');
+  if(!slotFree(S.date,S.slot))out.push(S.modo==='domicilio'?'Ese día no quedan servicios disponibles. Cambia de fecha.':'La parcela ya está reservada ese día. Cambia de fecha.');
   dsgn().forEach(it=>{const q=countOf(it.id),l=avail(it.id,S.date,S.slot);if(q>l)out.push(`${it.name}: tienes ${q} y solo hay ${l} disponible${l===1?'':'s'} para esa fecha.`)});
   if(!quote().lines.length)out.push(S.modo==='domicilio'?'Tu cotización está vacía. Agrega servicios desde el catálogo.':'Tu cotización está vacía. Agrega servicios desde el catálogo o el simulador.');
   if(S.modo==='domicilio'){
@@ -333,7 +333,7 @@ function refreshCart(){
   const q=quote(),n=q.lines.reduce((a,l)=>a+l.qty,0);
   $('#cartpill').textContent=`${n} ítem${n===1?'':'s'} · ${CLP(q.total)}`;
   if($('#qmeta')){
-  $('#qmeta').textContent=`${fmtDate(S.date)} · ${SLOTS[S.slot].n} (${SLOTS[S.slot].h})`;
+  $('#qmeta').textContent=`${fmtDate(S.date)} · ${DK.horarioTxt(S.modo,readLugar())}`;
   $('#qlines').innerHTML=q.lines.length?q.lines.map(l=>`<li><span>${esc(l.name)}${l.qty>1?` <span class="muted">× ${l.qty}</span>`:''}</span><span>${CLP(l.sub)}</span></li>`).join(''):'<li><span class="muted">Sin servicios todavía</span><span></span></li>';
   $('#qtotal').textContent=CLP(q.total);$('#qabono').textContent=CLP(q.abono);
   const is=issues();$('#issues').innerHTML=is.map(t=>`<p>${esc(t)}</p>`).join('');
@@ -352,8 +352,9 @@ $('#clientForm').addEventListener('submit',e=>{
   const kid=$('#cKid').value.trim(),kb=$('#cKidBirth').value;
   if(kid.length<2){err.textContent='Escribe el nombre del niño o niña cumpleañero/a.';err.hidden=false;return}
   if(!kb||parseISO(kb)>today||parseISO(kb)<new Date(today.getFullYear()-25,today.getMonth(),today.getDate())){err.textContent='Indica la fecha de nacimiento del niño o niña (la usamos para saludarlo en su cumpleaños).';err.hidden=false;return}
+  if($('#cDeco').checked&&$('#cDecoDet').value.trim().length<3){err.textContent='Cuéntanos qué decoración quieres (temática, colores o personaje).';err.hidden=false;return}
   if(!$('#cConsent').checked){err.textContent='Para reservar debes aceptar que guardemos los datos.';err.hidden=false;return}
-  if(S.modo==='domicilio'){const L=readLugar(),bad=!S.zona?'Elige la zona de despacho.':String(L.direccion).trim().length<5?'Escribe la dirección completa donde se montarán los juegos.':!L.suelo?'Indica el tipo de suelo del lugar.':!(+L.ancho>=1&&+L.largo>=1)?'Indica el ancho y el largo del espacio disponible, en metros.':!L.luz?'Indica si hay un enchufe de 220 V cerca.':!L.agua?'Indica si hay agua cerca.':'';
+  if(S.modo==='domicilio'){const L=readLugar(),bad=!S.zona?'Elige la zona de despacho.':String(L.direccion).trim().length<5?'Escribe la dirección completa donde se montarán los juegos.':!L.suelo?'Indica el tipo de suelo del lugar.':!(+L.ancho>=1&&+L.largo>=1)?'Indica el ancho y el largo del espacio disponible, en metros.':!L.luz?'Indica si hay un enchufe de 220 V cerca.':!L.agua?'Indica si hay agua cerca.':!L.retiro?'Elige la hora de retiro de los juegos (a más tardar 21:00).':'';
     if(bad){err.textContent=bad;err.hidden=false;return}}
   if(issues().length){return}
   $('#payAmt').textContent=CLP(quote().abono);$('#payMsg').hidden=true;$('#payGo').disabled=false;$('#payOv').hidden=false;$('#payGo').focus();
@@ -373,16 +374,17 @@ $('#payGo').onclick=async()=>{
   const client={name:$('#cName').value.trim(),email:$('#cMail').value.trim(),phone:$('#cPhone').value.trim(),guests:+$('#cGuests').value,kid:$('#cKid').value.trim(),kidBirth:$('#cKidBirth').value,consent:$('#cConsent').checked};
   const method=online?'Flow':document.querySelector('input[name=pm]:checked').value,txn=online?'':'TBK-'+Math.floor(Math.random()*9e8+1e8);
   const dom=S.modo==='domicilio',lugar=dom?readLugar():null;
+  const decoracion=$('#cDeco').checked,decoracionDetalle=decoracion?$('#cDecoDet').value.trim():'';
   const layout=dom?[]:S.placed.map(p=>({id:p.id,x:p.x,z:p.z,rot:p.rot}));
   try{
-    const res=await API.createReservation({date:S.date,slot:S.slot,client,items,parcela:dom?false:S.parcela,layout,method,txn,online,modalidad:S.modo,lugar,zona:dom?S.zona:''});
+    const res=await API.createReservation({date:S.date,slot:S.slot,client,items,parcela:dom?false:S.parcela,layout,method,txn,online,modalidad:S.modo,lugar,zona:dom?S.zona:'',decoracion,decoracionDetalle});
     if(online){
       // el cupo ya quedó guardado; ahora se lleva al cliente a pagar a Flow
       const url=await API.startPayment(res.folio,res.codigo);
       msg.innerHTML='<span class="spin"></span> Redirigiendo a Flow…';
       location.href=url;return;
     }
-    const r={id:res.folio,date:S.date,slot:S.slot,client,items,parcela:dom?false:S.parcela,modalidad:S.modo,lugar,status:res.estado,total:res.total,abono:res.abono,method,txn,layout};
+    const r={id:res.folio,date:S.date,slot:S.slot,client,items,parcela:dom?false:S.parcela,modalidad:S.modo,lugar,decoracion,decoracionDetalle,status:res.estado,total:res.total,abono:res.abono,method,txn,layout};
     DB.res.push({date:r.date,slot:r.slot,items,parcela:r.parcela,status:r.status});
     lastRes=r;$('#payOv').hidden=true;showDone(r);refreshAll();
   }catch(e){
@@ -403,7 +405,7 @@ async function showReturn(folio,codigo){
     await new Promise(r=>setTimeout(r,2500));   // la confirmación de Flow puede tardar unos segundos
   }
   if(!st)return panel('<h3>No encontramos esa reserva</h3><p class="muted">Revisa el enlace o escríbenos y la buscamos con tu folio.</p>'+again);
-  const cuando=`${fmtDate(st.fecha)}, franja ${SLOTS[st.franja]?SLOTS[st.franja].n.toLowerCase():st.franja}`;
+  const cuando=fmtDate(st.fecha);
   if(st.estado==='confirmada'||st.estado==='finalizada')
     return panel(`<div style="display:flex;gap:16px;align-items:center"><div class="okmark">✓</div><div><h3>¡Pago recibido! Reserva ${esc(st.folio)} confirmada</h3><p class="muted">Abono de ${CLP(st.abono)} pagado con Flow. Tu fiesta quedó reservada para el ${cuando}. El saldo de ${CLP(st.total-st.abono)} se paga el día del evento.</p></div></div>`+again);
   if(st.estado==='pendiente')
@@ -417,7 +419,7 @@ function showDone(r){
   $('#bookArea').innerHTML=`<div class="panel" style="grid-column:1/-1;display:grid;gap:16px;max-width:760px">
     <div style="display:flex;gap:16px;align-items:center"><div class="okmark">✓</div><div><h3>Reserva ${r.id} ${r.status==='confirmada'?'confirmada':'recibida'}</h3><p class="muted">Abono de ${CLP(r.abono)} recibido con ${esc(r.method)} (operación ${r.txn}, ambiente de pruebas).</p></div></div>
     ${r.status!=='confirmada'?'<p class="note" style="font-weight:600">Tu reserva queda pendiente hasta que el equipo valide el abono. Te avisaremos por correo.</p>':''}<p class="eyebrow">Vista previa del correo de confirmación (no se envía en esta demo)</p>
-    <div class="mail">Para: ${esc(r.client.email)}\nAsunto: Reserva ${r.id} confirmada, ${fmtDate(r.date)}\n\nHola ${esc(r.client.name)},\ntu fiesta quedó reservada para el ${fmtDate(r.date)}, franja ${SLOTS[r.slot].n.toLowerCase()} (${SLOTS[r.slot].h}).\n\n${r.parcela?'• Arriendo de la parcela\n':''}${r.modalidad==='domicilio'&&r.lugar?'• Servicio a domicilio en '+esc(r.lugar.direccion)+' (despacho, montaje y retiro incluidos)\n':''}${esc(items)}\n\nTotal: ${CLP(r.total)}\nAbono pagado: ${CLP(r.abono)}\nSaldo para el día del evento: ${CLP(r.total-r.abono)}\n\n${r.modalidad==='domicilio'?'Los datos de tu lugar quedaron guardados: el equipo los revisará y te contactará si necesita confirmar algo.':'Tu distribución 3D quedó guardada y el equipo la verá en su panel.'}</div>
+    <div class="mail">Para: ${esc(r.client.email)}\nAsunto: Reserva ${r.id} confirmada, ${fmtDate(r.date)}\n\nHola ${esc(r.client.name)},\ntu fiesta quedó reservada para el ${fmtDate(r.date)}.\nHorario: ${esc(DK.horarioTxt(r.modalidad,r.lugar))}.\n\n${r.parcela?'• Arriendo de la parcela\n':''}${r.modalidad==='domicilio'&&r.lugar?'• Servicio a domicilio en '+esc(r.lugar.direccion)+' (despacho, montaje y retiro incluidos)\n':''}${esc(items)}${r.decoracion?'\n• Decoración: '+esc(r.decoracionDetalle)+' (el equipo te contactará para coordinarla)':''}\n\nTotal: ${CLP(r.total)}\nAbono pagado: ${CLP(r.abono)}\nSaldo para el día del evento: ${CLP(r.total-r.abono)}\n\n${r.modalidad==='domicilio'?'Los datos de tu lugar quedaron guardados: el equipo los revisará y te contactará si necesita confirmar algo.':'Tu distribución 3D quedó guardada y el equipo la verá en su panel.'}</div>
     <div class="cta-row" style="margin:0"><button class="btn primary" id="again">Hacer otra reserva</button></div></div>`;
   $('#again').onclick=()=>location.reload();
   document.getElementById('reservar').scrollIntoView({behavior:'smooth'});
@@ -441,9 +443,9 @@ function parseDate(t){
 function availAnswer(dt){
   const ds=iso(dt);if(blockedDay(ds))return `El ${fmtDate(ds)} la parcela está bloqueada. ¿Te sirve otra fecha?`;
   const fr=Object.keys(SLOTS).filter(s=>slotFree(ds,s));
-  if(!fr.length)return `El ${fmtDate(ds)} no queda ninguna franja libre. Prueba con otra fecha en la sección <a href="#fecha">Fecha</a>.`;
+  if(!fr.length)return `El ${fmtDate(ds)} la parcela ya está reservada. Prueba con otra fecha en la sección <a href="#fecha">Fecha</a>.`;
   const low=DESIGN.filter(i=>avail(i.id,ds,fr[0])===0).map(i=>i.name);
-  return `El ${fmtDate(ds)} hay parcela libre en: <b>${fr.map(s=>SLOTS[s].n+' ('+SLOTS[s].h+')').join(' y ')}</b>.`+(low.length?`<br>Sin stock esa fecha: ${low.join(', ')}.`:'')+`<br><a href="#fecha" data-pick="${ds}">Elegir esta fecha</a>`;
+  return `El ${fmtDate(ds)} la parcela está libre, de <b>${DK.HORARIO.parcela.inicio} a ${DK.HORARIO.parcela.fin}</b>.`+(low.length?`<br>Sin stock esa fecha: ${low.join(', ')}.`:'')+`<br><a href="#fecha" data-pick="${ds}">Elegir esta fecha</a>`;
 }
 // servicios nombrados en la pregunta (por palabras del nombre: "castillo", "tobogan", "piscina"...)
 function itemsIn(q){return DESIGN.filter(i=>norm(i.name).split(/\s+/).some(w=>w.length>3&&!['maquina','mesa','chica','grande','azucar'].includes(w)&&q.includes(w.replace(/s$/,''))))}
@@ -470,7 +472,7 @@ const FAQ=[
  ['comida',/(papas|algod|completo|comida|maquina|hot ?dog|dulce|snack)/,()=>'Máquinas de alimentos:<br>'+priceList('comida')],
  ['piscinas',/(piscina|agua|pileta|chapotear)/,()=>'Piscinas:<br>'+priceList('piscinas')],
  ['horario_atencion',/(horario de atencion|atienden|abierto|cuando (puedo )?(llamar|escribir)|dias de atencion|atencion)/,()=>NEG.atencion?`Atendemos: ${esc(NEG.atencion)}. También puedes ${waLink}.`:`Para saber cuándo atiende el equipo, puedes ${waLink}.`],
- ['horario_franjas',/(franja|turno|a que hora|hora del evento|cuanto dura|duracion|manana o tarde|horarios?)/,()=>`Hay dos franjas por día: <b>Mañana ${SLOTS.manana.h}</b> y <b>Tarde ${SLOTS.tarde.h}</b>.`],
+ ['horario_franjas',/(franja|turno|a que hora|hora del evento|cuanto dura|duracion|manana o tarde|horarios?)/,()=>`La parcela se arrienda de <b>${DK.HORARIO.parcela.inicio} a ${DK.HORARIO.parcela.fin}</b> y puedes llegar desde las ${DK.HORARIO.parcela.preparar} para preparar. A domicilio, entregamos los juegos desde las ${DK.HORARIO.domicilio.entrega} y los retiramos a la hora que elijas, hasta las ${DK.HORARIO.domicilio.retiroMax}.`],
  ['simulador',/(3d|simulador|distribu|mover|arrastr|disenar|diseno)/,()=>'En el <a href="#simulador">simulador 3D</a> arrastras los juegos por el terreno, los giras y ves si caben. Lo que dejes ahí pasa directo a tu cotización.'],
  ['reservar',/(reserv|arrend|contrat|como (hago|funciona|se hace)|pasos|quiero (hacer|organizar)|agendar)/,()=>'Para reservar: 1) elige la fecha, 2) arma tu distribución en el <a href="#simulador">simulador 3D</a>, 3) revisa la cotización y 4) paga el abono en <a href="#reservar">Reservar</a>.'],
  ['contacto',/(humano|persona|whatsapp|contacto|telefono|ejecutiv|llamar|correo|email|mail|hablar con)/,()=>`Te derivo con el equipo: puedes ${waLink}${NEG.correo?` o escribir a ${esc(NEG.correo)}`:''}.`],
@@ -499,12 +501,15 @@ $('#chatFab').onclick=()=>{chatEl.hidden=false;$('#chatFab').hidden=true;if(!msg
 $('#chatX').onclick=()=>{chatEl.hidden=true;$('#chatFab').hidden=false};
 
 /* ---------- modalidad: parcela o domicilio ---------- */
-const LUGAR_IDS={tipo:'lTipo',direccion:'lDir',referencia:'lRef',suelo:'lSuelo',ancho:'lAncho',largo:'lLargo',alto:'lAlto',acceso:'lAcceso',nivel:'lNivel',luz:'lLuz',agua:'lAgua',pendiente:'lPend',obs:'lObs'};
+const LUGAR_IDS={tipo:'lTipo',direccion:'lDir',referencia:'lRef',suelo:'lSuelo',ancho:'lAncho',largo:'lLargo',alto:'lAlto',acceso:'lAcceso',nivel:'lNivel',luz:'lLuz',agua:'lAgua',pendiente:'lPend',obs:'lObs',retiro:'lRetiro'};
 function readLugar(){const o={};Object.entries(LUGAR_IDS).forEach(([k,id])=>{const e=document.getElementById(id);o[k]=e?e.value:''});['ancho','largo','alto','acceso'].forEach(k=>{if(o[k]!=='')o[k]=+o[k]});return o}
 $('#lTipo').innerHTML=Object.entries(DK.TIPOS_LUGAR).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 $('#lSuelo').innerHTML='<option value="">Elige…</option>'+Object.entries(DK.SUELOS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 $('#lZona').innerHTML='<option value="">Elige tu zona…</option>'+ZONAS.map(z=>`<option value="${esc(z.id)}">${esc(z.nombre)} · ${CLP(z.precio)}</option>`).join('');
 $('#lZona').onchange=()=>{S.zona=$('#lZona').value;refreshCart()};
+$('#lRetiro').innerHTML='<option value="">Elige…</option>'+DK.RETIROS.map(h=>`<option value="${h}">${h}</option>`).join('');
+$('#lRetiro').addEventListener('change',()=>{renderSlots();refreshCart()});
+$('#cDeco').onchange=()=>{$('#decoBox').hidden=!$('#cDeco').checked;if($('#cDeco').checked)$('#cDecoDet').focus()};
 Object.values(LUGAR_IDS).forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',refreshCart)});
 function setModo(m){
   if(m==='domicilio'&&!ZONAS.length){toast('El servicio a domicilio aún no está habilitado. Escríbenos por WhatsApp.');return}

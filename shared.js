@@ -18,7 +18,18 @@ function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeou
 
 /* ---------- datos ---------- */
 const CATS={juegos:'Juegos y entretención',comida:'Máquinas de alimentos',piscinas:'Piscinas',local:'Arriendo del local'};
-const SLOTS={manana:{n:'Mañana',h:'10:00 a 14:00'},tarde:{n:'Tarde',h:'15:00 a 19:00'}};
+/* Horario (definido por la empresa, noviembre 2026): un solo turno por día.
+   Parcela: 15:00 a 20:00, y se puede llegar dos horas antes (13:00) para preparar.
+   Domicilio: los juegos se entregan desde las 12:00 y se retiran a la hora que elige el cliente, a más tardar a las 21:00. */
+const SLOTS={tarde:{n:'Horario único',h:'15:00 a 20:00'}};
+const HORARIO={parcela:{inicio:'15:00',fin:'20:00',preparar:'13:00'},domicilio:{entrega:'12:00',retiroMax:'21:00'}};
+const RETIROS=['15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
+const slotName=k=>SLOTS[k]?SLOTS[k].n:(k==='manana'?'Mañana (horario anterior)':String(k||''));
+/* Texto del horario según la modalidad (lugar = datos del domicilio, para mostrar la hora de retiro elegida) */
+function horarioTxt(modo,lugar){
+  if(modo==='domicilio')return `Entrega desde las ${HORARIO.domicilio.entrega} · retiro ${lugar&&lugar.retiro?'a las '+lugar.retiro:'hasta las '+HORARIO.domicilio.retiroMax}`;
+  return `${HORARIO.parcela.inicio} a ${HORARIO.parcela.fin} (puedes llegar desde las ${HORARIO.parcela.preparar} para preparar)`;
+}
 const CAT=[
  {id:'castillo',cat:'juegos',name:'Castillo inflable',desc:'Torres y salto libre para los más chicos.',price:45000,stock:2,w:4.5,d:4.5,h:3.5,color:0xff5fa2,shape:'castle'},
  {id:'tobogan',cat:'juegos',name:'Tobogán inflable',desc:'Rampa de subida y bajada con plataforma.',price:70000,stock:1,w:4,d:7,h:4.5,color:0x3d7bff,shape:'slide'},
@@ -30,7 +41,7 @@ const CAT=[
  {id:'completos',cat:'comida',name:'Máquina de completos',desc:'Completos armados al instante.',price:35000,stock:2,w:1.4,d:1.1,h:1.6,color:0xe0402f,top:0xffc21a,shape:'machine'},
  {id:'piscinaS',cat:'piscinas',name:'Piscina chica',desc:'Diámetro 3 m, para los más pequeños.',price:20000,stock:3,w:3,d:3,h:0.6,color:0x39a0ff,shape:'pool'},
  {id:'piscinaL',cat:'piscinas',name:'Piscina grande',desc:'Diámetro 5 m, hasta 12 niños.',price:35000,stock:2,w:5,d:5,h:0.8,color:0x1f86e8,shape:'pool'},
- {id:'parcela',cat:'local',name:'Arriendo de la parcela',desc:'Recinto completo de 30 × 20 m con cerco, quincho y árboles.',price:150000,stock:1,w:30,d:20,h:0,color:0x7ccf7a,shape:'land'}
+ {id:'parcela',cat:'local',name:'Arriendo de la parcela',desc:'Recinto completo de 30 × 20 m con cerco, quincho y árboles.',price:300000,stock:1,w:30,d:20,h:0,color:0x7ccf7a,shape:'land'}
 ];
 CAT.forEach(i=>{i.active=true;if(i.top==null)i.top=0xffffff});
 const ALL=[...CAT];            // todos los servicios (incluye los eliminados, para reservas antiguas)
@@ -165,7 +176,7 @@ async function api(method,url,body){
 const adm=(tabla,accion,fila,clave)=>api('POST','/api/admin/'+tabla,{accion,fila,clave});
 
 /* ----- modo demo (localStorage) ----- */
-const DKEY='diverti-kids-demo-v2';
+const DKEY='diverti-kids-demo-v3';   // v3: un solo horario por día (las reservas de ejemplo antiguas tenían mañana y tarde)
 function demoSeed(){
   const d=n=>iso(addDays(today,n));
   const KIDS=[['Sofía',6,25],['Mateo',8,-5],['Isidora',5,40],['Benjamín',7,12],['Emilia',9,200]]; // [niño, edad que cumple, días hasta su próximo cumpleaños]
@@ -175,10 +186,10 @@ function demoSeed(){
   const price=it=>Object.entries(it).reduce((a,[k,q])=>a+byId(k).price*q,byId('parcela').price);
   const R=[
    mk('R-1001',4,'tarde','Cliente de ejemplo 1',{castillo:1,papas:1},'confirmada',[{id:'castillo',x:-3,z:2,rot:0},{id:'papas',x:6,z:-3,rot:0}]),
-   mk('R-1002',6,'manana','Cliente de ejemplo 2',{tobogan:1,piscinaL:1,algodon:1},'confirmada',[{id:'tobogan',x:2,z:-2,rot:Math.PI/2},{id:'piscinaL',x:-5,z:4,rot:0},{id:'algodon',x:8,z:5,rot:0}]),
+   mk('R-1002',7,'tarde','Cliente de ejemplo 2',{tobogan:1,piscinaL:1,algodon:1},'confirmada',[{id:'tobogan',x:2,z:-2,rot:Math.PI/2},{id:'piscinaL',x:-5,z:4,rot:0},{id:'algodon',x:8,z:5,rot:0}]),
    mk('R-1003',6,'tarde','Cliente de ejemplo 3',{castillo:1,tacataca:2},'pendiente',[{id:'castillo',x:0,z:0,rot:0},{id:'tacataca',x:6,z:4,rot:0},{id:'tacataca',x:6,z:6,rot:0}]),
    mk('R-1004',13,'tarde','Cliente de ejemplo 4',{cancha:1,completos:1},'confirmada',[{id:'cancha',x:0,z:0,rot:0},{id:'completos',x:9,z:5,rot:0}]),
-   mk('R-1005',20,'manana','Cliente de ejemplo 5',{castillo:2,pingpong:1},'pendiente',[{id:'castillo',x:-4,z:0,rot:0},{id:'castillo',x:4,z:0,rot:0},{id:'pingpong',x:0,z:6,rot:0}])
+   mk('R-1005',20,'tarde','Cliente de ejemplo 5',{castillo:2,pingpong:1},'pendiente',[{id:'castillo',x:-4,z:0,rot:0},{id:'castillo',x:4,z:0,rot:0},{id:'pingpong',x:0,z:6,rot:0}])
   ];
   R.forEach(r=>{r.total=price(r.items);r.abono=Math.round(r.total*.3)});
   return {res:R,blocked:[{date:d(11),why:'Mantención de la parcela'}],catalog:{},seq:1006,clientes:[],ofertas:[{id:1,titulo:'Oferta de ejemplo: piscina de regalo',texto:'Arrienda un castillo inflable y la piscina chica va con 50 % de descuento. Edítala o bórrala desde el panel.',hasta:'',activa:true}],propuestas:[]};
@@ -215,7 +226,7 @@ function buildClients(res,extras){
     const names=Object.entries(r.items||{}).map(([k,q])=>(byId(k)?byId(k).name:k)+(q>1?' ×'+q:''));
     if(r.parcela)names.unshift('Parcela');
     else if(r.modalidad==='domicilio')names.unshift('A domicilio');
-    c.eventos.push({fecha:r.date,arrendo:names.join(', '),total:r.total||0,estado:r.status,folio:r.id,modalidad:r.modalidad||'parcela',direccion:r.lugar&&r.lugar.direccion||''});
+    c.eventos.push({fecha:r.date,arrendo:names.join(', '),total:r.total||0,estado:r.status,folio:r.id,modalidad:r.modalidad||'parcela',direccion:r.lugar&&r.lugar.direccion||'',decoracion:r.decoracion?(r.decoracionDetalle||'Sí'):''});
     c.total+=(r.status==='confirmada'||r.status==='finalizada'?r.abono||0:0)+(r.status==='finalizada'?(r.total||0)-(r.abono||0):0);
   });
   (extras||[]).forEach(x=>{
@@ -326,16 +337,18 @@ const API={
         p_fecha:p.date,p_franja:p.slot,p_nombre:p.client.name,p_email:p.client.email,p_telefono:p.client.phone,
         p_invitados:p.client.guests,p_items:p.items,p_parcela:p.parcela,p_layout:p.layout,p_metodo:p.method,p_transaccion:p.txn,p_online:!!p.online,
         p_nino:p.client.kid,p_nacimiento:p.client.kidBirth,p_acepta:!!p.client.consent,
-        p_modalidad:p.modalidad||'parcela',p_lugar:p.lugar||null,p_zona:p.zona||null});
+        p_modalidad:p.modalidad||'parcela',p_lugar:p.lugar||null,p_zona:p.zona||null,
+        p_decoracion:!!p.decoracion,p_decoracion_detalle:p.decoracion?(p.decoracionDetalle||''):null});
     }
     const s=demoLoad();
     const dom=p.modalidad==='domicilio';
     const zona=dom?(s.zonas||ZONAS_DEMO).find(z=>z.id===p.zona&&z.activa!==false):null;
     if(dom&&!zona)throw new Error('Elige la zona de despacho.');
     const flete=zona?zona.precio:0;
+    if(p.decoracion&&String(p.decoracionDetalle||'').trim().length<3)throw new Error('Cuéntanos qué decoración quieres (temática, colores o personaje).');
     const total=Object.entries(p.items).reduce((a,[k,q])=>a+byId(k).price*q,0)+(!dom&&p.parcela?byId('parcela').price:0)+flete;
     const abono=Math.round(total*.3),folio='R-'+(s.seq++);
-    s.res.push({id:folio,date:p.date,slot:p.slot,client:p.client,items:p.items,parcela:dom?false:p.parcela,modalidad:dom?'domicilio':'parcela',lugar:dom?p.lugar:null,flete,zona:dom?p.zona:'',status:'confirmada',total,abono,method:p.method,txn:p.txn,layout:dom?[]:p.layout});
+    s.res.push({id:folio,date:p.date,slot:p.slot,client:p.client,items:p.items,parcela:dom?false:p.parcela,modalidad:dom?'domicilio':'parcela',lugar:dom?p.lugar:null,flete,zona:dom?p.zona:'',decoracion:!!p.decoracion,decoracionDetalle:p.decoracion?String(p.decoracionDetalle).trim():'',status:'confirmada',total,abono,method:p.method,txn:p.txn,layout:dom?[]:p.layout});
     demoSave(s);
     return {folio,total,abono,estado:'confirmada'};
   },
@@ -376,7 +389,7 @@ const API={
         ofertas:(d.ofertas||[]).map(offerFromRow),
         propuestas:d.propuestas||[],
         zonas:(d.zonas||[]).map(zonaFromRow),
-        res:(d.reservas||[]).map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||'',modalidad:x.modalidad||'parcela',lugar:x.lugar||null,flete:x.flete||0,zona:x.zona||''})),
+        res:(d.reservas||[]).map(x=>({id:x.folio,date:x.fecha,slot:x.franja,client:{name:x.nombre,email:x.email,phone:x.telefono,guests:x.invitados,kid:x.nombre_nino||'',kidBirth:x.nacimiento_nino||''},items:x.items||{},parcela:!!x.parcela,status:x.estado,total:x.total,abono:x.abono,method:x.metodo_pago,txn:x.transaccion,layout:x.layout||[],note:x.nota||'',modalidad:x.modalidad||'parcela',lugar:x.lugar||null,flete:x.flete||0,zona:x.zona||'',decoracion:!!x.decoracion,decoracionDetalle:x.decoracion_detalle||''})),
         blocked:(d.bloqueos||[]).map(x=>({date:x.fecha,why:x.motivo||'',aplica:x.aplica||'todo'})),
         catalog:Object.fromEntries((d.catalogo||[]).map(x=>[x.item_id,fromRow(x)]))
       };
@@ -466,5 +479,5 @@ const API={
   }
 };
 
-window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,SUELOS,TIPOS_LUGAR,siteChecks,needsPower,isInflable,nf,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
+window.DK={$,$$,CLP,esc,pad,iso,parseISO,MESES,fmtDate,today,addDays,toast,CATS,SLOTS,HORARIO,RETIROS,slotName,horarioTxt,CAT,ALL,byId,DESIGN,TERR,OBST,API,applyCatalog,SHAPES,numHex,hexNum,resizeImage,fitGLB,applyTerrain,sanitizeTerrain,terrainOf,TERRAIN_TYPES,TEXTURES,GROUNDS,DEFAULT_TERRAIN,PRESET_DIVERTI,buildClients,SUELOS,TIPOS_LUGAR,siteChecks,needsPower,isInflable,nf,nextBirthday,lastBirthday,monthlyBalance,waPhone,waUrl,phoneKey,normTxt,offerActive};
 })();

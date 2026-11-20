@@ -35,10 +35,10 @@ await p.click('#payGo'); await p.waitForURL(/\/pay\?token=TOK1/, { timeout: 8000
 ok('el navegador es enviado a la página de pago que entregó Flow');
 const [res] = await db('select * from reservas');
 assert.equal(res.estado, 'por_pagar'); assert.equal(res.nombre_nino, 'Sofía'); assert.equal(res.nacimiento_nino, '2020-03-05'); assert.equal(res.acepta_datos, true);
-assert.equal(res.modalidad, 'parcela'); assert.equal(res.metodo_pago, 'Flow'); assert.equal(res.total, 195000);
+assert.equal(res.modalidad, 'parcela'); assert.equal(res.metodo_pago, 'Flow'); assert.equal(res.total, 345000);
 ok('la reserva quedó en la base "por pagar", con los datos del niño, el consentimiento y el total calculado por el servidor');
 const pago = s.flow.log.find((x) => x.path === '/api/payment/create').params;
-assert.equal(pago.amount, '58500'); ok('a Flow se le cobró el abono que fijó el servidor (58.500)');
+assert.equal(pago.amount, '103500'); ok('a Flow se le cobró el abono que fijó el servidor (103.500)');
 
 // Flow confirma el pago y devuelve al cliente al sitio
 await fetch(s.url + '/api/flow/confirmacion', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'token=TOK1' });

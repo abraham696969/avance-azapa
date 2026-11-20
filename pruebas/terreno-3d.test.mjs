@@ -35,7 +35,7 @@ const FAKE = `(function(){
 const TERRENO = { w: 40, d: 25, ground: 'tierra', fence: true, photo: 'http://x.test/aerea.jpg', model: '', modelRot: 0, items: [
   { id: 'q1', t: 'quincho', name: 'Quincho', x: -12, z: -8, w: 6, d: 4, rot: 0 }, { id: 'a1', t: 'arbol', name: 'Árbol', x: 10, z: 5, w: 2, d: 2, rot: 0 },
   { id: 'b1', t: 'bano', name: 'Baños', x: 15, z: -9, w: 3, d: 3, rot: 90 }, { id: 'p1', t: 'piscina', name: 'Piscina', x: 0, z: 8, w: 6, d: 3, rot: 0 }] };
-const estado = (terreno, catalog) => `localStorage.setItem('diverti-kids-demo-v2', ${JSON.stringify(JSON.stringify({ res: [], blocked: [], catalog: catalog || {}, seq: 1006, terrain: terreno }))});`;
+const estado = (terreno, catalog) => `localStorage.setItem('diverti-kids-demo-v3', ${JSON.stringify(JSON.stringify({ res: [], blocked: [], catalog: catalog || {}, seq: 1006, terrain: terreno }))});`;
 
 const srv = await servir(root);
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });

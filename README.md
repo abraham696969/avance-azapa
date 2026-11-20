@@ -5,7 +5,7 @@ Plataforma web para Divertí Kids (Entretenciones Francisco Javier Hernández Gi
 
 **Sitio publicado:** https://diverti-kids.up.railway.app (panel: `/admin.html`). Publicado el 9 de noviembre de 2026 en el período de prueba de Railway, con el pago en el ambiente de pruebas de Flow (sin cobros reales).
 
-- **Sitio de clientes** (`index.html`): cinco páginas (Inicio, Juegos y servicios, Arma tu fiesta, Reservar y Contacto) con catálogo, disponibilidad por fecha y franja, simulador 3D de la parcela, cotización, reserva con pago del abono (30 %) a través del sitio, arriendo a domicilio, ofertas y chatbot.
+- **Sitio de clientes** (`index.html`): cinco páginas (Inicio, Juegos y servicios, Arma tu fiesta, Reservar y Contacto) con catálogo, disponibilidad por fecha (parcela de 15:00 a 20:00; a domicilio, entrega desde las 12:00 y retiro hasta las 21:00), simulador 3D de la parcela, opción de pedir decoración, cotización, reserva con pago del abono (30 %) a través del sitio, arriendo a domicilio, ofertas y chatbot.
 - **Panel de administración** (`admin.html`): reservas, clientes, cumpleaños, balance mensual, ofertas, domicilio, servicios y terreno.
 - **Tecnologías:** HTML, CSS y JavaScript sin framework; three.js; servidor en Node.js (`server/index.mjs`) con base de datos PostgreSQL, alojados en **Railway** (plan Hobby a contratar por la empresa); pago con Flow; SheetJS.
 
@@ -21,6 +21,7 @@ La instalación paso a paso está en [INSTRUCCIONES.md](INSTRUCCIONES.md). Si se
 | 4 | 26 al 30 de octubre | A pedido de la empresa: datos del niño o niña con consentimiento, cartera de clientes, cumpleaños y propuestas por WhatsApp, balance mensual, exportación a Excel, ofertas, redes sociales y arriendo a domicilio. 189 comprobaciones automáticas. |
 | 5 | 2 al 6 de noviembre | La empresa decidió pagar Railway: el sitio pasó de Supabase a un servidor propio con PostgreSQL (login del panel, archivos y pago con Flow en el servidor). Rediseño del sitio en cinco páginas con los colores del logo y carrusel con las fotos de los juegos. 256 comprobaciones automáticas. |
 | 6 | 9 al 13 de noviembre | En curso. Sitio publicado en Railway con su base PostgreSQL. Flow conectado en ambiente de pruebas: pago aprobado de punta a punta (reserva confirmada por el servidor). Pruebas funcionales en el sitio publicado y corrección de lo que encontraron (formulario sin datos de ejemplo, mensajes claros si Flow rechaza un dato, fecha liberada si el pago no se inicia y página sin campos de tarjeta). 262 comprobaciones automáticas. |
+| 7 | 16 al 20 de noviembre | En curso. Cambios pedidos por la empresa: un solo horario por día (parcela de 15:00 a 20:00, con llegada desde las 13:00 para preparar; a domicilio, entrega desde las 12:00 y retiro a la hora que elige el cliente, a más tardar 21:00), arriendo de la parcela a $300.000 y opción de pedir decoración indicando cuál. 270 comprobaciones automáticas. |
 
 El detalle de cada versión está en el historial de este repositorio.
 
@@ -55,4 +56,4 @@ El detalle de cada versión está en el historial de este repositorio.
 
 ## Pruebas automáticas
 
-Necesitan Node.js, Playwright y PGlite (PostgreSQL en memoria). Cada prueba se corre con `node pruebas/<nombre>.test.mjs`; la lista completa y su propósito están en [INSTRUCCIONES.md](INSTRUCCIONES.md#pruebas-automáticas-opcional-para-quien-programe). Son 13 suites con 262 comprobaciones; el servidor se prueba con una base PostgreSQL real en memoria y un Flow simulado que, como el real, rechaza correos no válidos.
+Necesitan Node.js, Playwright y PGlite (PostgreSQL en memoria). Cada prueba se corre con `node pruebas/<nombre>.test.mjs`; la lista completa y su propósito están en [INSTRUCCIONES.md](INSTRUCCIONES.md#pruebas-automáticas-opcional-para-quien-programe). Son 13 suites con 270 comprobaciones; el servidor se prueba con una base PostgreSQL real en memoria y un Flow simulado que, como el real, rechaza correos no válidos.

@@ -69,7 +69,7 @@ const sync=()=>{
   const modo=$('#modo'),ird=$('#irDomicilio');if(modo&&ird)ird.hidden=modo.hidden;
   const sim=$('#simulador'),dom=sim&&sim.hidden;
   const p2=$('[data-paso="fiesta"] span');if(p2)p2.textContent=dom?'Elige la fecha':'Fecha y diseño';
-  const ban=$('[data-page="fiesta"] .pbanner p');if(ban)ban.textContent=dom?'Elige el día y la franja. Los datos de tu casa o local los completas al reservar.':'Elige el día y la franja, y distribuye los juegos en la parcela para ver cómo queda.';
+  const ban=$('[data-page="fiesta"] .pbanner p');if(ban)ban.textContent=dom?'Elige el día. Los datos de tu casa o local y la hora de retiro los completas al reservar.':'Elige el día y distribuye los juegos en la parcela para ver cómo queda.';
 };
 ['#modo','#simulador'].forEach(s=>{const el=$(s);el&&new MutationObserver(sync).observe(el,{attributes:true,attributeFilter:['hidden']})});
 sync();

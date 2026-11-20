@@ -10,7 +10,7 @@ await ctx.route(/(cdnjs|jsdelivr|googleapis|gstatic)/, r => r.abort());
 const errs = []; let n = 0; const ok = m => console.log('  ✓', m, `(${++n})`);
 const p = await ctx.newPage(); p.on('pageerror', e => errs.push('público: ' + e.message)); p.on('dialog', d => d.accept());
 const pad = x => String(x).padStart(2, '0'); const hoy = new Date();
-const st = () => p.evaluate(() => JSON.parse(localStorage['diverti-kids-demo-v2']));
+const st = () => p.evaluate(() => JSON.parse(localStorage['diverti-kids-demo-v3']));
 await p.goto(srv.url + '/index.html?todo=1'); await p.waitForTimeout(800);
 
 // ---- selector de modalidad
@@ -43,8 +43,14 @@ await p.selectOption('#lAgua', ''); await p.click('#payBtn');
 assert((await p.textContent('#formErr')).includes('dirección')); ok('exige la dirección del lugar');
 await p.fill('#lDir', 'Av. Siempre Viva 742, población Los Álamos'); await p.click('#payBtn');
 assert((await p.textContent('#formErr')).includes('agua')); await p.selectOption('#lAgua', 'si'); ok('exige indicar si hay agua cerca');
+await p.click('#payBtn'); assert((await p.textContent('#formErr')).includes('hora de retiro'));
+assert.deepEqual(await p.$$eval('#lRetiro option', o => o.map(x => x.value).filter(Boolean)), ['15:00','16:00','17:00','18:00','19:00','20:00','21:00']);
+await p.selectOption('#lRetiro', '19:00'); ok('exige la hora de retiro y no ofrece horas después de las 21:00');
+assert((await p.textContent('#slots')).includes('Entrega desde las 12:00 · retiro a las 19:00')); ok('el horario muestra la entrega desde las 12:00 y el retiro elegido');
+await p.check('#cDeco'); assert(await p.isVisible('#cDecoDet')); await p.click('#payBtn');
+assert((await p.textContent('#formErr')).includes('decoración')); await p.fill('#cDecoDet', 'Spiderman, rojo y azul'); ok('si marca decoración, debe escribir cuál');
 await p.fill('#lObs', 'Perro en el patio'); await p.click('#payBtn'); assert(await p.isVisible('#payOv')); await p.click('#payGo'); await p.waitForTimeout(2200);
-const done = await p.textContent('#bookArea'); assert(done.includes('confirmada') && done.includes('Servicio a domicilio en Av. Siempre Viva 742')); ok('la reserva a domicilio se confirma y el correo menciona la dirección');
+const done = await p.textContent('#bookArea'); assert(done.includes('confirmada') && done.includes('Servicio a domicilio en Av. Siempre Viva 742') && done.includes('Decoración: Spiderman, rojo y azul') && done.includes('retiro a las 19:00')); ok('la reserva a domicilio se confirma y el correo menciona la dirección');
 const r = (await st()).res.find(x => x.client.kid === 'Valentina');
 assert.equal(r.modalidad, 'domicilio'); assert.equal(r.parcela, false); assert.equal(r.flete, 15000); assert.equal(r.total, 60000); assert.deepEqual(r.layout, []);
 assert.equal(r.lugar.suelo, 'cemento'); assert.equal(r.lugar.ancho, 8); assert.equal(r.lugar.largo, 10); assert.equal(r.lugar.luz, 'no'); assert.equal(r.lugar.obs, 'Perro en el patio'); assert.equal(r.zona, 'azapa'); ok('quedan guardados el suelo, las medidas, la luz, el agua, la zona, el despacho y el total');
